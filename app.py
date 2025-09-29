@@ -5,26 +5,76 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from PIL import Image
 import io
+import google.generativeai as genai
 
-# --- Configuração de E-mail (PREENCHA COM SUAS INFORMAÇÕES) ---
-# ATENÇÃO: É uma má prática de segurança colocar senhas diretamente no código.
-# O ideal é usar variáveis de ambiente ou o sistema de secrets do Streamlit.
-# Para mais informações: https://docs.streamlit.io/library/advanced-features/secrets-management
-SMTP_SERVER = "smtp.gmail.com"  # Ex: "smtp.gmail.com" para o Gmail
-SMTP_PORT = 587  # Porta do servidor SMTP (587 para TLS)
-EMAIL_SENDER = "thalessena272006@gmail.com"  # Seu endereço de e-mail
-EMAIL_PASSWORD = "nfqi xmey kbqx yfki"  # Use uma "senha de app" se usar Gmail com 2FA
-SUPERVISOR_EMAIL = "ricardo8610@gmail.com"
+# --- Gerenciamento de Configurações e Segredos ---
+
+# Inicializa as variáveis de configuração
+GOOGLE_API_KEY = None
+EMAIL_SENDER = None
+EMAIL_PASSWORD = None
+SUPERVISOR_EMAIL = None
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+
+# Tenta carregar as configurações do st.secrets (ideal para deploy)
+try:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+    EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
+    EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
+    SUPERVISOR_EMAIL = st.secrets["SUPERVISOR_EMAIL"]
+    
+    genai.configure(api_key=GOOGLE_API_KEY)
+
+# Fallback para inputs manuais se secrets.toml não for encontrado (para desenvolvimento local)
+except (FileNotFoundError, KeyError):
+    st.sidebar.header("🔑 Configurações (Desenvolvimento Local)")
+    st.sidebar.warning(
+        "Arquivo de segredos não encontrado. "
+        "Por favor, insira as informações abaixo para continuar."
+    )
+    
+    st.sidebar.subheader("Configuração da IA")
+    GOOGLE_API_KEY = st.sidebar.text_input(
+        "Sua Google AI API Key:", 
+        type="password", 
+        help="Obtenha sua chave em https://aistudio.google.com/app/apikey"
+    )
+    if GOOGLE_API_KEY:
+        genai.configure(api_key=GOOGLE_API_KEY)
+
+    st.sidebar.subheader("Configuração de E-mail")
+    EMAIL_SENDER = st.sidebar.text_input("Seu e-mail de envio:", placeholder="seu_email@exemplo.com")
+    EMAIL_PASSWORD = st.sidebar.text_input("Sua senha de app:", type="password", help="Se usar Gmail com 2FA, gere uma 'Senha de App'.")
+    SUPERVISOR_EMAIL = st.sidebar.text_input("E-mail do Supervisor:", placeholder="supervisor@exemplo.com")
+
 # -----------------------------------------------------------------
 
-def send_emails(image_bytes, image_name, collaborator_email):
+def analyze_image_with_gemini(image_bytes):
     """
-    Função para enviar os e-mails para o supervisor (com anexo) e para o colaborador (confirmação).
+    Analisa uma imagem usando o Gemini (modelo Flash) e retorna uma descrição.
+    """
+    if not GOOGLE_API_KEY:
+        return "Análise de IA desabilitada. Nenhuma chave de API fornecida."
+
+    try:
+        model = genai.GenerativeModel(model_name='gemini-1.5-flash-latest')
+        image_pil = Image.open(io.BytesIO(image_bytes))
+        prompt = "Descreva detalhadamente o que você vê nesta imagem, de forma objetiva. Esta descrição será enviada em um e-mail para um supervisor, para que ele entenda o conteúdo da imagem sem precisar abri-la."
+        
+        response = model.generate_content([prompt, image_pil])
+        return response.text
+    except Exception as e:
+        return f"Erro ao contatar a API de IA: {e}"
+
+
+def send_emails(image_bytes, image_name, collaborator_email, image_description):
+    """
+    Função para enviar os e-mails para o supervisor (com anexo e descrição da IA) e para o colaborador (confirmação).
     """
     try:
-        # Conectando ao servidor SMTP
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()  # Habilita a segurança
+        server.starttls()
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         # --- E-mail para o Supervisor ---
@@ -33,15 +83,23 @@ def send_emails(image_bytes, image_name, collaborator_email):
         msg_supervisor['To'] = SUPERVISOR_EMAIL
         msg_supervisor['Subject'] = f"Nova Imagem Recebida de {collaborator_email}"
 
-        # Corpo do e-mail do supervisor
-        body_supervisor = f"Olá,\n\nUma nova imagem foi enviada pelo colaborador {collaborator_email}.\n\nA imagem está em anexo.\n\nAtenciosamente,\nSistema Automático"
+        body_supervisor = f"""Olá,
+
+Uma nova imagem foi enviada pelo colaborador {collaborator_email}.
+
+Abaixo está uma descrição da imagem gerada por IA:
+--------------------------------------------------
+{image_description}
+--------------------------------------------------
+
+A imagem original está em anexo para sua referência.
+
+Atenciosamente,
+Sistema Automático"""
         msg_supervisor.attach(MIMEText(body_supervisor, 'plain'))
 
-        # Anexando a imagem
         image = MIMEImage(image_bytes, name=image_name)
         msg_supervisor.attach(image)
-
-        # Enviando o e-mail do supervisor
         server.sendmail(EMAIL_SENDER, SUPERVISOR_EMAIL, msg_supervisor.as_string())
 
         # --- E-mail de Confirmação para o Colaborador ---
@@ -49,63 +107,61 @@ def send_emails(image_bytes, image_name, collaborator_email):
         msg_collaborator['From'] = EMAIL_SENDER
         msg_collaborator['To'] = collaborator_email
         msg_collaborator['Subject'] = "Confirmação de Envio de Imagem"
-
-        # Corpo do e-mail do colaborador
-        body_collaborator = "Olá,\n\nEste é um e-mail de confirmação.\n\nSua imagem foi enviada com sucesso para o seu supervisor.\n\nAtenciosamente,\nSistema Automático"
+        body_collaborator = "Olá,\n\nEste é um e-mail de confirmação. Sua imagem e a análise da IA foram enviadas com sucesso para o seu supervisor.\n\nAtenciosamente,\nSistema Automático"
         msg_collaborator.attach(MIMEText(body_collaborator, 'plain'))
-
-        # Enviando o e-mail do colaborador
         server.sendmail(EMAIL_SENDER, collaborator_email, msg_collaborator.as_string())
 
         server.quit()
         return True, "E-mails enviados com sucesso!"
 
     except Exception as e:
-        print(f"Erro ao enviar e-mails: {e}")
         return False, f"Ocorreu um erro ao enviar os e-mails: {e}"
-
 
 # --- Interface do Streamlit ---
 
 st.set_page_config(layout="centered")
+st.title("📤 App de Envio de Imagem com Análise de IA")
 
-st.title("📤 App de Envio de Imagem para Supervisão")
+st.write("Faça o upload de uma imagem. Uma IA irá analisá-la e você poderá enviar a imagem com a descrição para seu supervisor.")
 
-st.write("Faça o upload de uma imagem. Ela será exibida abaixo e você terá a opção de enviá-la para seu supervisor.")
+# Verifica se todas as configurações estão preenchidas
+all_configs_set = all([GOOGLE_API_KEY, EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL])
+if not all_configs_set:
+    st.warning("Faltam configurações na barra lateral. Por favor, preencha todas as informações para habilitar o envio.")
 
-# Input para o e-mail do colaborador
+
 collaborator_email = st.text_input(
     "Digite seu e-mail para receber a confirmação:",
     placeholder="seu_email@exemplo.com"
 )
 
-# 1. Input da imagem
 uploaded_file = st.file_uploader(
     "Escolha uma imagem",
     type=["png", "jpg", "jpeg"],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    disabled=not all_configs_set
 )
 
-# Verifica se um arquivo foi enviado e se o e-mail do colaborador foi preenchido
 if uploaded_file is not None and collaborator_email:
-    # Para garantir que a imagem possa ser lida várias vezes
     image_bytes = uploaded_file.getvalue()
-    
-    # Abrindo a imagem para exibição
     image = Image.open(io.BytesIO(image_bytes))
 
     st.divider()
-
-    # 2. Exibição da imagem
-    st.subheader("Visualização da Imagem")
+    st.subheader("🖼️ Visualização da Imagem")
     st.image(image, caption=f"Imagem a ser enviada: {uploaded_file.name}", use_column_width=True)
+    
+    st.divider()
+    st.subheader("🤖 Análise da Imagem por IA (Gemini)")
+    
+    with st.spinner("Analisando a imagem com a IA..."):
+        ai_description = analyze_image_with_gemini(image_bytes)
+    st.text_area("Descrição gerada:", value=ai_description, height=200, help="Esta descrição será incluída no corpo do e-mail para o supervisor.")
 
-    st.info("A imagem acima será enviada como anexo para o seu supervisor.")
+    st.divider()
 
-    # 3. Botão para enviar
     if st.button("🚀 Enviar para Supervisor", use_container_width=True):
         with st.spinner("Enviando e-mails, por favor aguarde..."):
-            success, message = send_emails(image_bytes, uploaded_file.name, collaborator_email)
+            success, message = send_emails(image_bytes, uploaded_file.name, collaborator_email, ai_description)
             if success:
                 st.success(message)
                 st.balloons()
@@ -114,3 +170,4 @@ if uploaded_file is not None and collaborator_email:
 
 elif uploaded_file and not collaborator_email:
     st.warning("Por favor, insira seu e-mail para continuar.")
+
