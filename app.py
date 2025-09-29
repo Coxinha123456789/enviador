@@ -39,7 +39,6 @@ TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke"
 
 
-# --- Funções Auxiliares (IA e E-mail) ---
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
     if not GOOGLE_API_KEY:
