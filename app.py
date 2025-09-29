@@ -128,7 +128,7 @@ if CONFIG_LOADED:
         
         st.divider()
         st.subheader("🖼️ Visualização da Imagem")
-        st.image(image_bytes, caption=f"Imagem a ser enviada: {uploaded_file.name}", use_column_width=True)
+        st.image(image_bytes, caption=f"Imagem a ser enviada: {uploaded_file.name}", use_container_width=True)
         
         st.divider()
         st.subheader("🤖 Análise da Imagem por IA")
