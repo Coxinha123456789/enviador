@@ -9,7 +9,7 @@ import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
-
+#--------------------------------------------------------possivelmente vou tirar
 st.title("Exemplos CRUD - Firebase")
 
 # Conectar Firebase
@@ -24,6 +24,29 @@ def conectar_firebase():
 
 db = conectar_firebase()
 colecao = 'usuarios2'
+
+# READ - Ler documentos  
+st.header("READ")
+if st.button("Listar todos"):
+    docs = db.collection(colecao).stream()
+    for doc in docs:
+        st.write(f"{doc.id}: {doc.to_dict()}")
+
+# UPDATE - Atualizar documento
+st.header("UPDATE")
+doc_id = st.text_input("ID do documento")
+novo_nome = st.text_input("Novo nome")
+if st.button("Atualizar"):
+    db.collection(colecao).document(doc_id).update({'nome': novo_nome})
+    st.write("Atualizado!")
+
+# DELETE - Deletar documento
+st.header("DELETE")  
+id_deletar = st.text_input("ID para deletar")
+if st.button("Deletar"):
+    db.collection(colecao).document(id_deletar).delete()
+    st.write("Deletado!")
+#----------------------------------- possivelmente vou tirar
 
 # --- Configuração da Página ---
 st.set_page_config(layout="centered", page_title="Envio com IA")
