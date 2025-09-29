@@ -138,7 +138,7 @@ if CONFIG_LOADED:
         if ai_description:
             st.text_area("Descrição gerada:", value=ai_description, height=200, disabled=True)
             
-            if st.button("🚀 Enviar para Supervisor", use_container_width=True):
+            if st.button("🚀 Enviar para Supervisor", width="stretch"):  # atualizado
                 with st.spinner("Enviando e-mails, por favor aguarde..."):
                     success, message = send_emails(image_bytes, uploaded_file.name, collaborator_email, ai_description)
                 
