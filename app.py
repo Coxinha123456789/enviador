@@ -11,9 +11,8 @@ import google.generativeai as genai
 st.set_page_config(layout="centered", page_title="Envio com IA")
 
 # --- Gerenciamento de Configurações e Segredos ---
-GOOGLE_API_KEY = EMAIL_SENDER = EMAIL_PASSWORD = SUPERVISOR_EMAIL = None
-CONFIG_LOADED = False
 
+# Tenta carregar as configurações do st.secrets (ideal para deploy)
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
@@ -22,7 +21,10 @@ try:
     
     genai.configure(api_key=GOOGLE_API_KEY)
     CONFIG_LOADED = True
+
+# Fallback para inputs manuais se secrets.toml não for encontrado (para desenvolvimento local)
 except (FileNotFoundError, KeyError):
+    CONFIG_LOADED = False
     st.error("Arquivo de segredos não configurado para deploy. Por favor, configure os secrets no painel do Streamlit Cloud.")
 
 # --- Funções Auxiliares ---
@@ -44,7 +46,9 @@ def analyze_image_with_gemini(image_bytes):
 
 
 def send_emails(image_bytes, image_name, collaborator_email, image_description):
-    """Envia e-mails para o supervisor (com anexo e descrição) e para o colaborador (confirmação)."""
+    """
+    Envia e-mails para o supervisor (com anexo e descrição) e para o colaborador (confirmação).
+    """
     try:
         # Configurações do servidor SMTP
         SMTP_SERVER = "smtp.gmail.com"
@@ -77,8 +81,7 @@ Sistema Automático"""
         msg_supervisor.attach(MIMEText(body_supervisor, 'plain'))
         
         # Anexando a imagem
-        image = MIMEImage(image_bytes)
-        image.add_header('Content-Disposition', 'attachment', filename=image_name)
+        image = MIMEImage(image_bytes, name=image_name)
         msg_supervisor.attach(image)
         
         server.sendmail(EMAIL_SENDER, SUPERVISOR_EMAIL, msg_supervisor.as_string())
@@ -123,11 +126,7 @@ if CONFIG_LOADED:
         
         st.divider()
         st.subheader("🖼️ Visualização da Imagem")
-        st.image(
-            image_bytes,
-            caption=f"Imagem a ser enviada: {uploaded_file.name}",
-            width="stretch"   # atualizado
-        )
+        st.image(image_bytes, caption=f"Imagem a ser enviada: {uploaded_file.name}", use_column_width=True)
         
         st.divider()
         st.subheader("🤖 Análise da Imagem por IA")
@@ -138,7 +137,7 @@ if CONFIG_LOADED:
         if ai_description:
             st.text_area("Descrição gerada:", value=ai_description, height=200, disabled=True)
             
-            if st.button("🚀 Enviar para Supervisor", width="stretch"):  # atualizado
+            if st.button("🚀 Enviar para Supervisor", use_container_width=True):
                 with st.spinner("Enviando e-mails, por favor aguarde..."):
                     success, message = send_emails(image_bytes, uploaded_file.name, collaborator_email, ai_description)
                 
@@ -150,3 +149,4 @@ if CONFIG_LOADED:
 
     elif uploaded_file and not collaborator_email:
         st.warning("Por favor, insira seu e-mail para continuar.")
+
