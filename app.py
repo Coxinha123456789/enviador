@@ -38,7 +38,7 @@ def analyze_image_with_gemini(image_bytes):
         model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         
         image_pil = Image.open(io.BytesIO(image_bytes))
-        prompt = "Descreva o que você vê nesta imagem, de forma objetiva, com mais ou menos um paragrafo."
+        prompt = "Descreva o que você vê nesta imagem, de forma objetiva, entorno de 2 linhas de texto."
         
         response = model.generate_content([prompt, image_pil])
         return response.text
