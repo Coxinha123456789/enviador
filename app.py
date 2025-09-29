@@ -11,8 +11,9 @@ import google.generativeai as genai
 st.set_page_config(layout="centered", page_title="Envio com IA")
 
 # --- Gerenciamento de Configurações e Segredos ---
+GOOGLE_API_KEY = EMAIL_SENDER = EMAIL_PASSWORD = SUPERVISOR_EMAIL = None
+CONFIG_LOADED = False
 
-# Tenta carregar as configurações do st.secrets (ideal para deploy)
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
@@ -21,10 +22,7 @@ try:
     
     genai.configure(api_key=GOOGLE_API_KEY)
     CONFIG_LOADED = True
-
-# Fallback para inputs manuais se secrets.toml não for encontrado (para desenvolvimento local)
 except (FileNotFoundError, KeyError):
-    CONFIG_LOADED = False
     st.error("Arquivo de segredos não configurado para deploy. Por favor, configure os secrets no painel do Streamlit Cloud.")
 
 # --- Funções Auxiliares ---
@@ -34,24 +32,19 @@ def analyze_image_with_gemini(image_bytes):
     if not GOOGLE_API_KEY:
         return "Análise de IA desabilitada. Nenhuma chave de API fornecida."
     try:
-        # Tente esse modelo se estiver disponível
         model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = "Descreva detalhadamente o que você vê nesta imagem, de forma objetiva. Esta descrição será enviada em um e-mail para um supervisor, para que ele entenda o conteúdo da imagem sem precisar abri-la."
         
         response = model.generate_content([prompt, image_pil])
-        return response.text  # ou outro atributo se necessário
+        return response.text
     except Exception as e:
         st.error(f"Erro ao contatar a API de IA: {e}")
         return None
 
 
-
-
 def send_emails(image_bytes, image_name, collaborator_email, image_description):
-    """
-    Envia e-mails para o supervisor (com anexo e descrição) e para o colaborador (confirmação).
-    """
+    """Envia e-mails para o supervisor (com anexo e descrição) e para o colaborador (confirmação)."""
     try:
         # Configurações do servidor SMTP
         SMTP_SERVER = "smtp.gmail.com"
@@ -84,7 +77,8 @@ Sistema Automático"""
         msg_supervisor.attach(MIMEText(body_supervisor, 'plain'))
         
         # Anexando a imagem
-        image = MIMEImage(image_bytes, name=image_name)
+        image = MIMEImage(image_bytes)
+        image.add_header('Content-Disposition', 'attachment', filename=image_name)
         msg_supervisor.attach(image)
         
         server.sendmail(EMAIL_SENDER, SUPERVISOR_EMAIL, msg_supervisor.as_string())
@@ -129,7 +123,11 @@ if CONFIG_LOADED:
         
         st.divider()
         st.subheader("🖼️ Visualização da Imagem")
-        st.image(image_bytes, caption=f"Imagem a ser enviada: {uploaded_file.name}", use_container_width=True)
+        st.image(
+            image_bytes,
+            caption=f"Imagem a ser enviada: {uploaded_file.name}",
+            width="stretch"   # atualizado
+        )
         
         st.divider()
         st.subheader("🤖 Análise da Imagem por IA")
@@ -152,4 +150,3 @@ if CONFIG_LOADED:
 
     elif uploaded_file and not collaborator_email:
         st.warning("Por favor, insira seu e-mail para continuar.")
-
