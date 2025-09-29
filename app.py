@@ -102,7 +102,7 @@ Sistema Automático"""
 
 # --- Interface do Streamlit ---
 
-st.title("📤 App de Envio de Imagem com Análise de IA")
+st.title("📤 App de Envio de Imagem")
 st.write("Faça o upload de uma imagem, digite seu e-mail e envie o material para seu supervisor com uma análise automática.")
 
 if CONFIG_LOADED:
