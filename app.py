@@ -243,4 +243,3 @@ else:
         if st.button("Fazer Logout"):
             st.session_state.clear()
             st.rerun()
-
