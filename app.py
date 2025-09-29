@@ -34,7 +34,7 @@ def analyze_image_with_gemini(image_bytes):
     if not GOOGLE_API_KEY:
         return "Análise de IA desabilitada. Nenhuma chave de API fornecida."
     try:
-        model = genai.GenerativeModel(model_name='gemini-1.5-flash')
+        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = "Descreva detalhadamente o que você vê nesta imagem, de forma objetiva. Esta descrição será enviada em um e-mail para um supervisor, para que ele entenda o conteúdo da imagem sem precisar abri-la."
         
@@ -43,6 +43,7 @@ def analyze_image_with_gemini(image_bytes):
     except Exception as e:
         st.error(f"Erro ao contatar a API de IA: {e}")
         return None
+
 
 
 def send_emails(image_bytes, image_name, collaborator_email, image_description):
