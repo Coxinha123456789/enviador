@@ -27,7 +27,8 @@ colecao = 'ColecaoEnviados'
 
 user_ref = db.collection(colecao).document(st.user.email)
 doc = user_ref.get()
-dados = doc.to_dict() if doc.exists else {}
+dados = doc.to_disc() if doc.exists else {}
+
 
 st.title("Aplicativo Principal")
 
