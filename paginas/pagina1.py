@@ -12,7 +12,22 @@ from datetime import datetime
 
 import pandas as pd 
 
+@st.cache_resource
+def conectar_firebase():
+    """Initializes the Firebase app and returns a Firestore client."""
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        cred = credentials.Certificate(dict(st.secrets["firebase"]))
+        firebase_admin.initialize_app(cred)
+    return firestore.client()
 
+db = conectar_firebase()
+colecao = 'ColecaoEnviados'
+
+user_ref = db.collection(colecao).document(st.user.email)
+            doc = user_ref.get()
+            dados = doc.to_dict() if doc.exists else {}
 
 st.title("Aplicativo Principal")
 
@@ -158,3 +173,6 @@ if CONFIG_LOADED:
 
     elif uploaded_file and not collaborator_email:
         st.warning("Por favor, insira seu e-mail para continuar.")
+
+dados['envios'].append({
+            'texto':ai_description})
