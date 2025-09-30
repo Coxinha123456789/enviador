@@ -9,6 +9,29 @@ import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
+
+import streamlit as st
+import pandas as pd # ou qualquer outra biblioteca que você use
+
+# --- CÓDIGO DE DIAGNÓSTICO TEMPORÁRIO ---
+st.subheader("Diagnóstico de Segredos (apague isso depois)")
+st.write("As seguintes chaves/seções de segredos foram carregadas:")
+st.write(st.secrets.keys())
+# ----------------------------------------
+
+
+# O RESTO DO SEU CÓDIGO COMEÇA AQUI
+# Exemplo:
+st.title("Meu Aplicativo Principal")
+
+# ... aqui vem a sua lógica que usa st.secrets.firebase ...
+try:
+    # Tente acessar uma chave específica para ver se o erro acontece
+    project_id = st.secrets.firebase.project_id
+    st.success("Consegui ler o project_id do Firebase com sucesso!")
+except Exception as e:
+    st.error(f"Erro ao tentar ler os segredos do Firebase: {e}")
+    
 #--------------------------------------------------------possivelmente vou tirar
 st.title("Exemplos CRUD - Firebase")
 
