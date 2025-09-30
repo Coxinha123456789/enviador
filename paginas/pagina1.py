@@ -174,6 +174,9 @@ if CONFIG_LOADED:
             if st.button("🚀 Enviar para Supervisor", width="stretch"):  # atualizado
                 with st.spinner("Enviando e-mails, por favor aguarde..."):
                     success, message = send_emails(image_bytes, uploaded_file.name, collaborator_email, ai_description)
+                if 'envios' not in dados:
+                    dados['envios'] = []
+                dados['envios'].append({ai_description})
                 
                 if success:
                     st.success(message)
@@ -184,10 +187,3 @@ if CONFIG_LOADED:
     elif uploaded_file and not collaborator_email:
         st.warning("Por favor, insira seu e-mail para continuar.")
 
-# Passo 1: Verifique se a chave 'envios' não existe no dicionário.
-if 'envios' not in dados:
-    # Passo 2: Se não existir, crie-a como uma lista vazia.
-    dados['envios'] = []
-
-# Passo 3: Agora é seguro adicionar o item, pois a lista sempre existirá.
-dados['envios'].append({ai_description})
