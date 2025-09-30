@@ -47,7 +47,7 @@ if CONFIG_LOADED:
     st.title("Aplicativo Principal")
     
     # Este bloco só deve ser executado se o usuário estiver logado
-    if "user" in st and hasattr(st.user, 'email'):
+    if hasattr(st, "user") and hasattr(st.user, "email"):
         user_ref = db.collection(colecao).document(st.user.email)
         doc = user_ref.get()
         # CORREÇÃO 1: Método corrigido para to_dict()
