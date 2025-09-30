@@ -184,5 +184,10 @@ if CONFIG_LOADED:
     elif uploaded_file and not collaborator_email:
         st.warning("Por favor, insira seu e-mail para continuar.")
 
-dados['envios'].append({
-            'texto':ai_description})
+# Passo 1: Verifique se a chave 'envios' não existe no dicionário.
+if 'envios' not in dados:
+    # Passo 2: Se não existir, crie-a como uma lista vazia.
+    dados['envios'] = []
+
+# Passo 3: Agora é seguro adicionar o item, pois a lista sempre existirá.
+dados['envios'].append({ ... })
