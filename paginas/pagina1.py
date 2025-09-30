@@ -171,34 +171,34 @@ if CONFIG_LOADED:
         if ai_description:
             st.text_area("Descrição gerada:", value=ai_description, height=200, disabled=True)
             
-                if st.button("🚀 Enviar para Supervisor"):
-                    with st.spinner("Enviando e-mails e salvando registro..."):
-                        success, message = send_emails(
-                            image_bytes, 
-                            uploaded_file.name, 
-                            collaborator_email, 
-                            ai_description
-                        )
+            if st.button("🚀 Enviar para Supervisor"):
+                with st.spinner("Enviando e-mails e salvando registro..."):
+                    success, message = send_emails(
+                        image_bytes, 
+                        uploaded_file.name, 
+                        collaborator_email, 
+                        ai_description
+                    )
                         
-                        if success:
-                            try:
+                    if success:
+                        try:
 
-                                novo_envio = {
-                                    "descricao": ai_description,
-                                    "nome_arquivo": uploaded_file.name,
-                                    "data_envio": datetime.now() # Salva a data e hora também
-                                }
-                                dados.setdefault('envios', []).append(novo_envio)
+                            novo_envio = {
+                                "descricao": ai_description,
+                                "nome_arquivo": uploaded_file.name,
+                                "data_envio": datetime.now() # Salva a data e hora também
+                            }
+                            dados.setdefault('envios', []).append(novo_envio)
 
-                                user_ref.set(dados)
+                            user_ref.set(dados)
                                 
-                                st.success(f"{message} Registro salvo com sucesso!")
-                                st.balloons()
+                            st.success(f"{message} Registro salvo com sucesso!")
+                            st.balloons()
 
-                            except Exception as e:
-                                st.error(f"E-mails enviados, mas falha ao salvar no banco de dados: {e}")
-                        else:
-                            st.error(message)
+                        except Exception as e:
+                            st.error(f"E-mails enviados, mas falha ao salvar no banco de dados: {e}")
+                    else:
+                        st.error(message)
 
     elif uploaded_file and not collaborator_email:
         st.warning("Por favor, insira seu e-mail para continuar.")
