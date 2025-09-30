@@ -190,4 +190,4 @@ if 'envios' not in dados:
     dados['envios'] = []
 
 # Passo 3: Agora é seguro adicionar o item, pois a lista sempre existirá.
-dados['envios'].append({ ... })
+dados['envios'].append({ai_description})
