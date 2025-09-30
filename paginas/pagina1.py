@@ -9,12 +9,15 @@ import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
+import pandas as pd
 
-import pandas as pd 
+# CORREÇÃO 2: st.set_page_config() movido para o topo.
+st.set_page_config(layout="centered", page_title="Envio com IA")
 
 @st.cache_resource
 def conectar_firebase():
     """Initializes the Firebase app and returns a Firestore client."""
+    # CORREÇÃO 3: Linhas reescritas para remover caracteres inválidos.
     try:
         firebase_admin.get_app()
     except ValueError:
@@ -25,29 +28,35 @@ def conectar_firebase():
 db = conectar_firebase()
 colecao = 'ColecaoEnviados'
 
-user_ref = db.collection(colecao).document(st.user.email)
-doc = user_ref.get()
-dados = doc.to_disc() if doc.exists else {}
-
-
-st.title("Aplicativo Principal")
-
-st.set_page_config(layout="centered", page_title="Envio com IA")
-
-# --- Gerenciamento de Configurações e Segredos ---
-GOOGLE_API_KEY = EMAIL_SENDER = EMAIL_PASSWORD = SUPERVISOR_EMAIL = None
+# --- Carregamento de Segredos e Configurações ---
 CONFIG_LOADED = False
-
 try:
+    # CORREÇÃO 3: Linhas reescritas para remover caracteres inválidos.
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
     EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
-    SUPERVISOR_EMAIL = st.secrets["SUPERVISOR_EMAIL"]
-    
+    SUPERVISOR_EMAIL = st.secrets.get("SUPERVISOR_EMAIL") # Usar .get() é mais seguro
+
     genai.configure(api_key=GOOGLE_API_KEY)
     CONFIG_LOADED = True
-except (FileNotFoundError, KeyError):
-    st.error("Arquivo de segredos não configurado para deploy. Por favor, configure os secrets no painel do Streamlit Cloud.")
+except (FileNotFoundError, KeyError) as e:
+    st.error(f"Erro ao carregar segredos: {e}. Por favor, configure os secrets no painel do Streamlit Cloud.")
+
+# Só continue se as configurações foram carregadas
+if CONFIG_LOADED:
+    st.title("Aplicativo Principal")
+    
+    # Este bloco só deve ser executado se o usuário estiver logado
+    if "user" in st and hasattr(st.user, 'email'):
+        user_ref = db.collection(colecao).document(st.user.email)
+        doc = user_ref.get()
+        # CORREÇÃO 1: Método corrigido para to_dict()
+        dados = doc.to_dict() if doc.exists else {}
+    else:
+        st.warning("Faça login para continuar.")
+        dados = {} # Garante que 'dados' exista mesmo sem login
+else:
+    st.stop() # Interrompe a execução se os segredos não foram carregados
 
 # --- Funções Auxiliares ---
 
