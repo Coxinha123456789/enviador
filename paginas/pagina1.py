@@ -14,7 +14,7 @@ from utils import conectar_firebase
 st.set_page_config(layout="centered", page_title="Envio com IA")
 
 
-db, bucket = conectar_firebase()
+db = conectar_firebase()
 
 colecao = 'ColecaoEnviados'
 
