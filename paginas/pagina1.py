@@ -9,7 +9,7 @@ import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
-from app import conectar_firebase 
+from utils import conectar_firebase 
 # --- Configuração da página ---
 st.set_page_config(layout="centered", page_title="Envio com IA")
 
