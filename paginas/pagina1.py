@@ -13,6 +13,8 @@ from datetime import datetime
 # --- Configuração da página ---
 st.set_page_config(layout="centered", page_title="Envio com IA")
 
+from firebase_admin import credentials, firestore, storage
+
 @st.cache_resource
 def conectar_firebase():
     try:
@@ -20,9 +22,10 @@ def conectar_firebase():
     except ValueError:
         cred = credentials.Certificate(dict(st.secrets["firebase"]))
         firebase_admin.initialize_app(cred, {
-            "storageBucket": st.secrets["FIREBASE_STORAGE_BUCKET"]
+            "storageBucket": "bancoenviados.firebasestorage.app"  # 🔹 seu bucket aqui
         })
     return firestore.client()
+
 
 db = conectar_firebase()
 colecao = 'ColecaoEnviados'
