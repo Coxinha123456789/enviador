@@ -7,7 +7,7 @@ from PIL import Image
 import io
 import google.generativeai as genai
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 from datetime import datetime
 
 # --- Configuração da página ---
@@ -19,7 +19,9 @@ def conectar_firebase():
         firebase_admin.get_app()
     except ValueError:
         cred = credentials.Certificate(dict(st.secrets["firebase"]))
-        firebase_admin.initialize_app(cred)
+        firebase_admin.initialize_app(cred, {
+            "storageBucket": st.secrets["FIREBASE_STORAGE_BUCKET"]
+        })
     return firestore.client()
 
 db = conectar_firebase()
@@ -125,6 +127,13 @@ Sistema Automático"""
                 ok, msg = send_emails()
                 if ok:
                     try:
+                        # 🔹 Upload da imagem para o Firebase Storage
+                        bucket = storage.bucket()
+                        blob = bucket.blob(f"envios/{collaborator_email}/{uploaded_file.name}")
+                        blob.upload_from_string(image_bytes, content_type=uploaded_file.type)
+                        blob.make_public()
+                        image_url = blob.public_url
+
                         # 🔹 Salvar no Firestore
                         user_ref = db.collection(colecao).document(collaborator_email)
                         doc = user_ref.get()
@@ -133,7 +142,8 @@ Sistema Automático"""
                         novo_envio = {
                             "descricao": ai_description,
                             "nome_arquivo": uploaded_file.name,
-                            "data_envio": datetime.now()
+                            "data_envio": datetime.now(),
+                            "url_imagem": image_url
                         }
                         dados.setdefault('envios', []).append(novo_envio)
                         user_ref.set(dados)
