@@ -121,38 +121,33 @@ if uploaded_file is not None:
                     email_subject, email_body, image_bytes, uploaded_file.name
                 )
 
-                if email_ok:
-                    # 2. Se os e-mails foram enviados, tenta salvar no Firebase
-                    try:
-                        # 2. CORREÇÃO: Usa o objeto 'bucket' que já temos da conexão
-                        blob = bucket.blob(f"envios/{collaborator_email}/{uploaded_file.name}")
-                        blob.upload_from_string(image_bytes, content_type=uploaded_file.type)
-                        
-                        # 3. ALERTA: Esta linha requer permissão de "Storage Object Admin"
-                        # Se não for necessário que todos na internet vejam o arquivo,
-                        # considere usar blob.generate_signed_url() em vez de .make_public()
-                        blob.make_public()
-                        image_url = blob.public_url
+                # ... (código anterior) ...
 
-                        # Salva as informações no Firestore
+                if email_ok:
+                    try:
+                        # --- Salva APENAS as informações no Firestore ---
                         user_ref = db.collection(colecao).document(collaborator_email)
                         doc = user_ref.get()
                         dados = doc.to_dict() if doc.exists else {}
+
+                        # Dicionário 'novo_envio' SIMPLIFICADO (sem a url_imagem)
                         novo_envio = {
                             "descricao": ai_description,
                             "nome_arquivo": uploaded_file.name,
-                            "data_envio": datetime.now(),
-                            "url_imagem": image_url
+                            "data_envio": datetime.now()
                         }
+                        
+                        # Adiciona o novo envio à lista de envios do usuário
                         dados.setdefault('envios', []).append(novo_envio)
+                        
+                        # Salva o documento inteiro de volta no Firestore
                         user_ref.set(dados)
 
-                        st.success(f"{email_msg} Registro salvo com sucesso!")
+                        st.success(f"{email_msg} Registro salvo com sucesso no banco de dados!")
                         st.balloons()
 
-                    except Forbidden:
-                        st.error("E-mails enviados, mas falha ao salvar a imagem! A conta de serviço não tem permissão para tornar arquivos públicos. Verifique as permissões IAM no Google Cloud.")
                     except Exception as e:
-                        st.error(f"E-mails enviados, mas falha ao salvar no banco de dados: {e}")
+                        # Mensagem de erro caso o salvamento no Firestore falhe
+                        st.error(f"E-mails enviados, mas falha ao salvar o registro no banco de dados: {e}")
                 else:
                     st.error(f"Falha no envio de e-mails: {email_msg}")
