@@ -9,29 +9,9 @@ import google.generativeai as genai
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
-
+from app import conectar_firebase 
 # --- Configuração da página ---
 st.set_page_config(layout="centered", page_title="Envio com IA")
-
-from firebase_admin import credentials, firestore, storage
-
-@st.cache_resource
-def conectar_firebase():
-    """Inicializa o Firebase e retorna os clientes do Firestore e do Storage."""
-    try:
-        firebase_admin.get_app()
-    except ValueError:
-        cred = credentials.Certificate(dict(st.secrets["firebase"]))
-        firebase_admin.initialize_app(
-            cred, 
-            {
-                'storageBucket': st.secrets.firebase.storageBucket
-            }
-        )
-    
-    db = firestore.client()
-    bucket = storage.bucket()
-    return db, bucket
 
 
 db, bucket = conectar_firebase()
