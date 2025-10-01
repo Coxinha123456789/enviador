@@ -70,7 +70,7 @@ def send_emails(sender, password, supervisor, collaborator, subject, body, image
 # -----------------------------------------------------------------------------
 
 # 1. CORREÇÃO: Chamar a função e desempacotar os DOIS valores
-db, bucket = conectar_firebase()
+db = conectar_firebase()
 colecao = 'ColecaoEnviados'
 
 # --- Carregamento de Segredos ---
