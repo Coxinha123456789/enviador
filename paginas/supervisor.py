@@ -61,13 +61,10 @@ if colaborador_selecionado:
                     st.write("**Descrição da IA:**")
                     st.write(envio["descricao"])
 
-                    if "nome_arquivo" in envio:
-                        try:
-                            # caso no futuro você salve a imagem no Firebase Storage,
-                            # aqui poderia mostrar via URL; por enquanto só exibe o nome
-                            st.info(f"Arquivo: {envio['nome_arquivo']}")
-                        except:
-                            st.warning("Imagem não disponível.")
+                    if "url_imagem" in envio:
+                        st.image(envio["url_imagem"], caption=envio["nome_arquivo"], use_container_width=True)
+                    else:
+                        st.warning("Imagem não disponível.")
         else:
             st.info(f"O colaborador **{colaborador_selecionado}** ainda não enviou imagens.")
     else:
