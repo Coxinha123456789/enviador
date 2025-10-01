@@ -1,6 +1,8 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
+from app import conectar_firebase
+db, bucket = conectar_firebase()
 
 st.set_page_config(page_title="Painel do Supervisor", layout="wide")
 
