@@ -1,23 +1,15 @@
+# No arquivo: paginas/supervisor.py (Versão Corrigida)
+
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore
-from utils import conectar_firebase
-db, bucket = conectar_firebase()
+from utils import conectar_firebase # 1. ÚNICA fonte para a conexão
+
+# 2. CORRIGIDO: Chamada correta da função, que agora só retorna 'db'
+db = conectar_firebase()
+colecao = 'ColecaoEnviados'
 
 st.set_page_config(page_title="Painel do Supervisor", layout="wide")
 
-# --- Conectar ao Firestore ---
-@st.cache_resource
-def conectar_firebase():
-    try:
-        firebase_admin.get_app()
-    except ValueError:
-        cred = credentials.Certificate(dict(st.secrets["firebase"]))
-        firebase_admin.initialize_app(cred)
-    return firestore.client()
-
-db = conectar_firebase()
-colecao = 'ColecaoEnviados'
+# --- 1. REMOVIDO: Função de conexão duplicada foi apagada daqui ---
 
 # --- Verificação de login ---
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
@@ -36,8 +28,12 @@ st.title("📊 Painel do Supervisor")
 st.write("Visualize os envios realizados pelos colaboradores.")
 
 # --- Listar colaboradores que já enviaram algo ---
-docs = db.collection(colecao).stream()
-colaboradores = [doc.id for doc in docs]
+try:
+    docs = db.collection(colecao).stream()
+    colaboradores = [doc.id for doc in docs]
+except Exception as e:
+    st.error(f"Erro ao buscar colaboradores: {e}")
+    colaboradores = []
 
 if not colaboradores:
     st.info("Nenhum colaborador enviou imagens ainda.")
@@ -58,15 +54,20 @@ if colaborador_selecionado:
         if envios:
             st.subheader(f"📂 Histórico de {colaborador_selecionado}")
             
-            for envio in sorted(envios, key=lambda x: x["data_envio"], reverse=True):
-                with st.expander(f"📎 {envio['nome_arquivo']} — {envio['data_envio']}"):
-                    st.write("**Descrição da IA:**")
-                    st.write(envio["descricao"])
+            # Ordena os envios pela data (garante que 'data_envio' exista)
+            envios_ordenados = sorted(
+                [e for e in envios if 'data_envio' in e], 
+                key=lambda x: x["data_envio"], 
+                reverse=True
+            )
 
-                    if "url_imagem" in envio:
-                        st.image(envio["url_imagem"], caption=envio["nome_arquivo"], use_container_width=True)
-                    else:
-                        st.warning("Imagem não disponível.")
+            for envio in envios_ordenados:
+                data_formatada = envio['data_envio'].strftime('%d/%m/%Y %H:%M')
+                with st.expander(f"📎 {envio.get('nome_arquivo', 'Sem nome')} — {data_formatada}"):
+                    st.write("**Descrição da IA:**")
+                    st.write(envio.get("descricao", "Nenhuma descrição."))
+
+                    # 3. REMOVIDO: Lógica da URL da imagem foi retirada pois não há upload
         else:
             st.info(f"O colaborador **{colaborador_selecionado}** ainda não enviou imagens.")
     else:
