@@ -15,7 +15,6 @@ SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"]
 user_email = getattr(st.user, "email", "").lower()
 user_name = getattr(st.user, "name", "Usuário")
 
-@st.cache_data(ttl=120)
 def get_supervisor_stats():
     """Busca o número total de envios pendentes para todos os colaboradores."""
     pendentes = 0
@@ -28,7 +27,6 @@ def get_supervisor_stats():
         st.error(f"Não foi possível carregar as estatísticas: {e}")
     return pendentes
 
-@st.cache_data(ttl=120)
 def get_collaborator_stats(email):
     """Busca as estatísticas de envios para um colaborador específico."""
     stats = {'pendentes': 0, 'aprovados': 0, 'reprovados': 0}
