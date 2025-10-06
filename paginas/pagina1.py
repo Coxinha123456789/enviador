@@ -17,9 +17,18 @@ st.set_page_config(layout="centered", page_title="Envio com IA")
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
     try:
-        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
+        model = genai.GenerativeModel(model_name='gemini-pro-vision')
         image_pil = Image.open(io.BytesIO(image_bytes))
-        prompt = "Descreva o que você vê nesta imagem, de forma objetiva, com no máximo 3 linhas."
+        # Prompt ajustado para o contexto profissional
+        prompt = """
+        Aja como uma assistente profissional para um supervisor. A imagem a seguir é um documento enviado por um colaborador (como um atestado médico, um recibo para reembolso, etc.). 
+        Sua tarefa é analisar a imagem e fornecer um breve parecer para o supervisor, destacando as informações mais importantes e sugerindo se o documento parece estar em conformidade para aprovação.
+        
+        Seu parecer deve ser objetivo e conciso (máximo de 4 linhas), contendo:
+        1. O tipo de documento que parece ser.
+        2. As informações chave contidas nele (ex: datas, valores, nomes).
+        3. Uma recomendação inicial (ex: "Parece legítimo para aprovação", "Requer verificação adicional", "Informações parecem inconsistentes").
+        """
         response = model.generate_content([prompt, image_pil])
         return response.text
     except Exception as e:
@@ -78,7 +87,7 @@ def upload_to_firebase_storage(image_bytes, user_email, file_name):
         return None
 
 # --- LÓGICA PRINCIPAL ---
-db, _ = conectar_firebase() # Agora desempacotamos o bucket também, mas não usamos aqui
+db, _ = conectar_firebase() 
 colecao = 'ColecaoEnviados'
 
 try:
@@ -112,17 +121,15 @@ if uploaded_file is not None:
         ai_description = analyze_image_with_gemini(image_bytes)
     
     if ai_description:
-        st.text_area("Descrição gerada:", value=ai_description, height=150, disabled=True)
+        st.text_area("Parecer da IA:", value=ai_description, height=150, disabled=True)
         
         if st.button("🚀 Enviar para Supervisor"):
             with st.spinner("Enviando e salvando..."):
-                # 1. Faz o upload da imagem para o Storage
                 image_url = upload_to_firebase_storage(image_bytes, collaborator_email, uploaded_file.name)
                 
                 if image_url:
-                    # 2. Envia os e-mails
                     email_subject = f"Nova Imagem Recebida de {collaborator_email}"
-                    email_body = f"""Olá,\n\nUma nova imagem foi enviada pelo colaborador {collaborator_email}.\n\nDescrição da imagem (IA):\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
+                    email_body = f"""Olá,\n\nUma nova imagem foi enviada pelo colaborador {collaborator_email}.\n\nParecer da IA:\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
                     
                     email_ok, email_msg = send_emails(
                         EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL, collaborator_email,
@@ -131,7 +138,6 @@ if uploaded_file is not None:
 
                     if email_ok:
                         try:
-                            # 3. Salva as informações no Firestore, incluindo a URL da imagem
                             user_ref = db.collection(colecao).document(collaborator_email)
                             doc = user_ref.get()
                             dados = doc.to_dict() if doc.exists else {}
@@ -140,7 +146,8 @@ if uploaded_file is not None:
                                 "descricao": ai_description,
                                 "nome_arquivo": uploaded_file.name,
                                 "data_envio": datetime.now(),
-                                "url_imagem": image_url 
+                                "url_imagem": image_url,
+                                "status": "Em processo"  # Novo campo de status
                             }
                             
                             dados.setdefault('envios', []).append(novo_envio)
