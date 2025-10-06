@@ -1,17 +1,13 @@
-# No arquivo: paginas/supervisor.py (Versão Corrigida)
+# No arquivo: paginas/supervisor.py
 
 import streamlit as st
-from utils import conectar_firebase # 1. ÚNICA fonte para a conexão
+from utils import conectar_firebase
 
-# 2. CORRIGIDO: Chamada correta da função, que agora só retorna 'db'
-db = conectar_firebase()
+db, _ = conectar_firebase()
 colecao = 'ColecaoEnviados'
 
 st.set_page_config(page_title="Painel do Supervisor", layout="wide")
 
-# --- 1. REMOVIDO: Função de conexão duplicada foi apagada daqui ---
-
-# --- Verificação de login ---
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
     st.warning("Você precisa fazer login como supervisor para acessar esta página.")
     st.stop()
@@ -23,11 +19,9 @@ if email_logado not in SUPERVISOR_EMAILS:
     st.error("Acesso negado. Esta página é restrita a supervisores.")
     st.stop()
 
-# --- Layout ---
 st.title("📊 Painel do Supervisor")
 st.write("Visualize os envios realizados pelos colaboradores.")
 
-# --- Listar colaboradores que já enviaram algo ---
 try:
     docs = db.collection(colecao).stream()
     colaboradores = [doc.id for doc in docs]
@@ -39,7 +33,6 @@ if not colaboradores:
     st.info("Nenhum colaborador enviou imagens ainda.")
     st.stop()
 
-# --- Sidebar para selecionar colaborador ---
 st.sidebar.header("👥 Colaboradores")
 colaborador_selecionado = st.sidebar.selectbox("Selecione um colaborador:", colaboradores)
 
@@ -54,7 +47,6 @@ if colaborador_selecionado:
         if envios:
             st.subheader(f"📂 Histórico de {colaborador_selecionado}")
             
-            # Ordena os envios pela data (garante que 'data_envio' exista)
             envios_ordenados = sorted(
                 [e for e in envios if 'data_envio' in e], 
                 key=lambda x: x["data_envio"], 
@@ -66,8 +58,11 @@ if colaborador_selecionado:
                 with st.expander(f"📎 {envio.get('nome_arquivo', 'Sem nome')} — {data_formatada}"):
                     st.write("**Descrição da IA:**")
                     st.write(envio.get("descricao", "Nenhuma descrição."))
+                    
+                    # Mostra a imagem a partir da URL salva
+                    if 'url_imagem' in envio:
+                        st.image(envio['url_imagem'], caption="Imagem Enviada")
 
-                    # 3. REMOVIDO: Lógica da URL da imagem foi retirada pois não há upload
         else:
             st.info(f"O colaborador **{colaborador_selecionado}** ainda não enviou imagens.")
     else:
