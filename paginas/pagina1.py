@@ -14,11 +14,12 @@ from google.api_core.exceptions import Forbidden
 
 st.set_page_config(layout="centered", page_title="Envio de Documentos")
 
-# ... (as funções analyze_image_with_gemini, send_emails, upload_to_firebase_storage permanecem as mesmas) ...
+# ... (as funções send_emails e upload_to_firebase_storage permanecem as mesmas) ...
 
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
     try:
+        # AQUI: Revertido para o nome do modelo original que você estava usando.
         model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = """
@@ -94,7 +95,7 @@ except Exception as e:
     st.error(f"Erro fatal ao carregar segredos: {e}. Verifique o arquivo secrets.toml.")
     st.stop()
 
-if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
+if not (hasattr(st, "user") and getattr(st, "user", "is_logged_in", False)):
     st.warning("Faça login para continuar.")
     st.stop()
 
@@ -105,21 +106,22 @@ st.write("Faça o upload de um documento (atestado, recibo, etc.) para análise 
 st.divider()
 
 # Inicializa o estado da sessão se não existir
-if 'ai_description' not in st.session_state:
-    st.session_state.ai_description = None
-if 'current_file_id' not in st.session_state:
-    st.session_state.current_file_id = None
+if "analysis_done" not in st.session_state:
+    st.session_state.analysis_done = False
+if "ai_description" not in st.session_state:
+    st.session_state.ai_description = ""
+
 
 with st.container(border=True):
     uploaded_file = st.file_uploader(
         "Selecione o arquivo de imagem", 
         type=["png", "jpg", "jpeg"],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        # A CADA NOVO UPLOAD, A SESSÃO É RESETADA
+        on_change=lambda: st.session_state.update(analysis_done=False, ai_description="")
     )
 
 if uploaded_file is not None:
-    # Cria um identificador único para o arquivo para saber se ele mudou
-    file_id = f"{uploaded_file.name}-{uploaded_file.size}"
     image_bytes = uploaded_file.getvalue()
     
     with st.container(border=True):
@@ -128,16 +130,16 @@ if uploaded_file is not None:
 
     with st.container(border=True):
         st.subheader("🤖 Análise e Parecer da IA")
-
-        # Só executa a análise se o arquivo for novo
-        if file_id != st.session_state.current_file_id:
+        
+        # Roda a análise apenas UMA VEZ por upload
+        if not st.session_state.analysis_done:
             with st.spinner("Analisando o documento..."):
                 st.session_state.ai_description = analyze_image_with_gemini(image_bytes)
-                st.session_state.current_file_id = file_id
-        
-        # Usa a descrição armazenada na sessão
+                st.session_state.analysis_done = True # Marca que a análise foi feita
+
         ai_description = st.session_state.ai_description
         
+        # Mostra o resultado e o botão de envio se a análise foi bem-sucedida
         if ai_description:
             st.text_area("Parecer gerado:", value=ai_description, height=150, disabled=True)
             
@@ -147,33 +149,4 @@ if uploaded_file is not None:
                     
                     if image_url:
                         email_subject = f"Novo Documento Recebido de {collaborator_email}"
-                        email_body = f"""Olá,\n\nUm novo documento foi enviado por {collaborator_email}.\n\nParecer da IA:\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
-                        
-                        email_ok, email_msg = send_emails(
-                            EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL, collaborator_email,
-                            email_subject, email_body, image_bytes, uploaded_file.name
-                        )
-
-                        if email_ok:
-                            try:
-                                user_ref = db.collection(colecao).document(collaborator_email)
-                                doc = user_ref.get()
-                                dados = doc.to_dict() if doc.exists else {}
-
-                                novo_envio = {
-                                    "descricao": ai_description,
-                                    "nome_arquivo": uploaded_file.name,
-                                    "data_envio": datetime.now(),
-                                    "url_imagem": image_url,
-                                    "status": "Em processo"
-                                }
-                                
-                                dados.setdefault('envios', []).append(novo_envio)
-                                user_ref.set(dados)
-
-                                st.success(f"{email_msg} Registro salvo com sucesso!")
-                                st.balloons()
-                            except Exception as e:
-                                st.error(f"E-mails enviados, mas falha ao salvar o registro: {e}")
-                        else:
-                            st.error(f"Falha no envio de e-mails: {email_msg}")
+                        email_body = f"""Olá,\n\nUm novo documento foi enviado por {collaborator_email}.\n\nParecer da IA:\n----------------
