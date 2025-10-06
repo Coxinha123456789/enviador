@@ -7,29 +7,27 @@ from datetime import timedelta
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 
-# --- Conexão com Firebase ---
+# ... (conexão e verificação de acesso) ...
 db, _ = conectar_firebase()
 colecao = 'ColecaoEnviados'
-
-# --- Verificação de Acesso ---
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
     st.warning("Você precisa fazer login como supervisor para acessar esta página.")
     st.stop()
-
 email_logado = getattr(st.user, "email", "").lower()
 SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"]
-
 if email_logado not in SUPERVISOR_EMAILS:
     st.error("Acesso negado. Esta página é restrita a supervisores.")
     st.stop()
 
-st.title(f"📊 Dashboard de Análise")
-st.write(f"Bem-vindo, {getattr(st.user, 'name', 'Supervisor')}. Aqui está um resumo da atividade dos colaboradores.")
+
+st.title(f"📊 Dashboard de Análise de Processos")
+st.write(f"Bem-vindo, {getattr(st.user, 'name', 'Supervisor')}. Monitore a eficiência e a conformidade dos envios.")
 st.divider()
 
 # --- Carregar e Processar Dados ---
 @st.cache_data(ttl=300)
 def carregar_dados():
+    # ... (código para carregar dados) ...
     todos_envios = []
     docs = db.collection(colecao).stream()
     for doc in docs:
@@ -47,7 +45,7 @@ if not envios_globais:
     st.info("Ainda não há dados de envios para exibir no dashboard.")
     st.stop()
 
-# --- Métricas Principais ---
+# ... (métricas principais) ...
 total_envios = len(envios_globais)
 pendentes = sum(1 for e in envios_globais if e.get('status') == 'Em processo')
 aprovados = sum(1 for e in envios_globais if e.get('status') == 'Aprovado')
@@ -61,9 +59,31 @@ col4.metric("Documentos Reprovados", f"{reprovados} 🔴")
 
 st.divider()
 
-# --- Gráficos ---
 df = pd.DataFrame(envios_globais)
 df['data_envio'] = pd.to_datetime(df['data_envio'])
+
+# --- NOVA SEÇÃO: ANÁLISE DE CAUSA RAIZ ---
+st.subheader("Análise de Causa Raiz de Não Conformidade")
+
+nao_conformes = [
+    item["requisito"]
+    for envio in envios_globais
+    if envio.get("analise_ia", {}).get("status_geral") == "NAO_CONFORME"
+    for item in envio["analise_ia"].get("laudo_tecnico", [])
+    if not item["cumprido"]
+]
+
+if nao_conformes:
+    causa_raiz_df = pd.DataFrame(nao_conformes, columns=["Motivo da Falha"]).value_counts().reset_index(name='Ocorrências')
+    st.bar_chart(causa_raiz_df.set_index('Motivo da Falha'))
+else:
+    st.success("Nenhuma falha de conformidade detectada nos envios recentes.")
+
+st.divider()
+
+
+# --- Gráficos Anteriores ---
+# ... (código dos gráficos de status, colaborador e atividade recente) ...
 df['data'] = df['data_envio'].dt.date
 
 col1, col2 = st.columns(2)
@@ -91,19 +111,9 @@ with col2:
     colaborador_counts = df['colaborador'].value_counts()
     st.bar_chart(colaborador_counts)
 
-# --- CORREÇÃO APLICADA AQUI ---
 st.subheader("Atividade Recente (Últimos 7 dias)")
-
-# 1. Pega a data e hora de agora e já define o fuso horário como UTC
 hoje_utc = pd.Timestamp.now(tz='UTC')
-
-# 2. Calcula a data de 7 dias atrás, mantendo o fuso horário UTC
 limite_data = hoje_utc - timedelta(days=7)
-
-# 3. Compara as duas datas, que agora são ambas "conscientes" do fuso horário UTC
 ultimos_7_dias = df[df['data_envio'] >= limite_data]
-
-# O restante do código funciona como antes
 envios_por_dia = ultimos_7_dias.groupby('data').size()
 st.line_chart(envios_por_dia)
-# --- FIM DA CORREÇÃO ---
