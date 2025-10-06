@@ -18,7 +18,7 @@ collaborator_email = getattr(st.user, "email", "não identificado")
 
 # --- Layout ---
 st.title("📜 Meu Histórico de Envios")
-st.write(f"Acompanhe o status dos documentos que você enviou, **{collaborator_email}**.")
+st.write(f"Acompanhe o status e o progresso dos documentos que você enviou.")
 st.divider()
 
 # --- Busca os dados no Firestore ---
@@ -37,31 +37,32 @@ try:
                 reverse=True
             )
 
-            # Exibe cada envio
             for envio in envios_ordenados:
                 with st.container(border=True):
-                    data_formatada = envio['data_envio'].strftime('%d/%m/%Y às %H:%M')
-                    status = envio.get('status', 'Em processo')
+                    status_final = envio.get('status', 'Em processo')
                     
-                    st.subheader(f"Enviado em: {data_formatada}")
+                    st.subheader(f"Arquivo: {envio.get('nome_arquivo', 'Sem nome')}")
                     
-                    # Define cor e ícone com base no status
-                    if status == 'Aprovado':
-                        st.markdown(f"**Status:** <span style='color: #22c55e;'>🟢 Aprovado</span>", unsafe_allow_html=True)
-                    elif status == 'Reprovado':
-                        st.markdown(f"**Status:** <span style='color: #ef4444;'>🔴 Reprovado</span>", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"**Status:** <span style='color: #eab308;'>🟡 Em processo</span>", unsafe_allow_html=True)
-                    
-                    col1, col2 = st.columns(2)
+                    if status_final == 'Aprovado': st.markdown(f"**Status Final:** <span style='color: #22c55e;'>🟢 Aprovado</span>", unsafe_allow_html=True)
+                    elif status_final == 'Reprovado': st.markdown(f"**Status Final:** <span style='color: #ef4444;'>🔴 Reprovado</span>", unsafe_allow_html=True)
+                    else: st.markdown(f"**Status Final:** <span style='color: #eab308;'>🟡 Em processo</span>", unsafe_allow_html=True)
+
+                    col1, col2 = st.columns([2, 3])
                     
                     with col1:
                         if 'url_imagem' in envio:
-                            st.image(envio['url_imagem'], caption=envio.get('nome_arquivo', ''))
+                            st.image(envio['url_imagem'])
                     
                     with col2:
-                        st.write("**Parecer da IA:**")
-                        st.info(envio.get("descricao", "Nenhuma descrição."))
+                        st.write("**Linha do Tempo do Processo:**")
+                        log_ordenado = sorted(envio.get('log', []), key=lambda x: x['timestamp'])
+
+                        for log in log_ordenado:
+                            data_log = log['timestamp'].strftime('%d/%m/%Y às %H:%M')
+                            st.markdown(f"- **{log['status']}** em {data_log}")
+                            if log.get('comentario'):
+                                st.info(f"Comentário: {log['comentario']}")
+
         else:
             st.info("Você ainda não enviou nenhum documento.")
     else:
