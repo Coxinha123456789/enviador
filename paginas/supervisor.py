@@ -20,7 +20,28 @@ if email_logado not in SUPERVISOR_EMAILS:
     st.stop()
 
 st.title("📊 Painel do Supervisor")
-st.write("Visualize os envios realizados pelos colaboradores.")
+st.write("Visualize e aprove os envios realizados pelos colaboradores.")
+
+def atualizar_status(colaborador_email, nome_arquivo, data_envio, novo_status):
+    """Atualiza o status de um envio específico no Firestore."""
+    try:
+        doc_ref = db.collection(colecao).document(colaborador_email)
+        doc = doc_ref.get()
+        if doc.exists:
+            dados = doc.to_dict()
+            envios = dados.get("envios", [])
+            
+            # Encontra o envio correto para atualizar
+            for envio in envios:
+                if envio.get('nome_arquivo') == nome_arquivo and envio.get('data_envio') == data_envio:
+                    envio['status'] = novo_status
+                    break
+            
+            doc_ref.set(dados)
+            return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar status: {e}")
+        return False
 
 try:
     docs = db.collection(colecao).stream()
@@ -53,16 +74,31 @@ if colaborador_selecionado:
                 reverse=True
             )
 
-            for envio in envios_ordenados:
+            for i, envio in enumerate(envios_ordenados):
                 data_formatada = envio['data_envio'].strftime('%d/%m/%Y %H:%M')
+                status_atual = envio.get('status', 'Em processo')
+
                 with st.expander(f"📎 {envio.get('nome_arquivo', 'Sem nome')} — {data_formatada}"):
-                    st.write("**Descrição da IA:**")
-                    st.write(envio.get("descricao", "Nenhuma descrição."))
+                    st.write(f"**Status:** {status_atual}")
+                    st.write("**Parecer da IA:**")
+                    st.info(envio.get("descricao", "Nenhuma descrição."))
                     
-                    # Mostra a imagem a partir da URL salva
                     if 'url_imagem' in envio:
                         st.image(envio['url_imagem'], caption="Imagem Enviada")
-
+                    
+                    # --- Botões de Aprovação/Reprovação ---
+                    if status_atual == "Em processo":
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("✅ Aprovar", key=f"aprovar_{i}"):
+                                if atualizar_status(colaborador_selecionado, envio['nome_arquivo'], envio['data_envio'], "Aprovado"):
+                                    st.success("Status atualizado para Aprovado!")
+                                    st.rerun()
+                        with col2:
+                            if st.button("❌ Reprovar", key=f"reprovar_{i}"):
+                                if atualizar_status(colaborador_selecionado, envio['nome_arquivo'], envio['data_envio'], "Reprovado"):
+                                    st.warning("Status atualizado para Reprovado!")
+                                    st.rerun()
         else:
             st.info(f"O colaborador **{colaborador_selecionado}** ainda não enviou imagens.")
     else:
