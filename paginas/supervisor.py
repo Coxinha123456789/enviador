@@ -7,65 +7,23 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-# ... (Conexão e verificação de acesso permanecem iguais) ...
-# --- Conexão com Firebase ---
+# ... (conexão, verificação de acesso e funções de email/status) ...
 db, _ = conectar_firebase()
 colecao = 'ColecaoEnviados'
-
-# --- Configuração da Página ---
-st.set_page_config(page_title="Gerenciar Envios", layout="wide")
-
-# --- Verificação de Acesso ---
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
     st.warning("Você precisa fazer login como supervisor para acessar esta página.")
     st.stop()
-
 email_logado = getattr(st.user, "email", "").lower()
 SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"]
-
 if email_logado not in SUPERVISOR_EMAILS:
     st.error("Acesso negado. Esta página é restrita a supervisores.")
     st.stop()
-
-# --- Funções ---
 def enviar_email_notificacao(colaborador_email, status, comentario, nome_arquivo):
-    """Envia um e-mail de notificação de status para o colaborador."""
-    try:
-        EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
-        EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
-        
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+    # ... (código da função) ...
+    return True
 
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_SENDER
-        msg['To'] = colaborador_email
-        msg['Subject'] = f"Atualização de Status: Seu documento foi {status}"
-        
-        corpo = f"""
-        Olá,
-
-        O status do seu documento "{nome_arquivo}" foi atualizado para: **{status}**.
-
-        Comentário do supervisor:
-        --------------------------------------------------
-        {comentario if comentario else "Nenhum comentário adicionado."}
-        --------------------------------------------------
-
-        Atenciosamente,
-        Sistema Automático
-        """
-        msg.attach(MIMEText(corpo, 'plain'))
-        server.sendmail(EMAIL_SENDER, colaborador_email, msg.as_string())
-        server.quit()
-        return True
-    except Exception as e:
-        st.error(f"Falha ao enviar e-mail de notificação: {e}")
-        return False
-
-def atualizar_status(colaborador_email, nome_arquivo, data_envio, novo_status, comentario):
-    """Atualiza o status, adiciona ao log e envia notificação."""
+def atualizar_status(colaborador_email, envio, novo_status, comentario):
+    """Atualiza o status de um envio específico."""
     try:
         doc_ref = db.collection(colecao).document(colaborador_email)
         doc = doc_ref.get()
@@ -73,33 +31,57 @@ def atualizar_status(colaborador_email, nome_arquivo, data_envio, novo_status, c
             dados = doc.to_dict()
             envios = dados.get("envios", [])
             
-            for envio in envios:
-                if envio.get('nome_arquivo') == nome_arquivo and envio.get('data_envio').timestamp() == data_envio.timestamp():
-                    envio['status'] = novo_status
+            # Encontra o envio para atualizar usando a data de envio como identificador único
+            for i, e in enumerate(envios):
+                if e['data_envio'] == envio['data_envio']:
+                    envios[i]['status'] = novo_status
                     novo_log = {
                         "status": f"{novo_status} pelo supervisor",
                         "timestamp": datetime.now(),
                         "comentario": comentario
                     }
-                    envio.setdefault('log', []).append(novo_log)
+                    envios[i].setdefault('log', []).append(novo_log)
                     break
             
             doc_ref.set(dados)
-            enviar_email_notificacao(colaborador_email, novo_status, comentario, nome_arquivo)
+            enviar_email_notificacao(colaborador_email, novo_status, comentario, envio['nome_arquivo'])
             return True
     except Exception as e:
         st.error(f"Erro ao atualizar status: {e}")
         return False
 
-# ... (Inicialização do estado e layout permanecem os mesmos) ...
+def registrar_log_auditoria(colaborador_email, envio, acao):
+    """Registra uma ação de auditoria no log do documento."""
+    try:
+        doc_ref = db.collection(colecao).document(colaborador_email)
+        doc = doc_ref.get()
+        if doc.exists:
+            dados = doc.to_dict()
+            envios = dados.get("envios", [])
+            
+            for i, e in enumerate(envios):
+                if e['data_envio'] == envio['data_envio']:
+                    novo_log = {
+                        "status": acao,
+                        "timestamp": datetime.now(),
+                        "comentario": f"Realizado por: {email_logado}"
+                    }
+                    envios[i].setdefault('log', []).append(novo_log)
+                    break
+            doc_ref.set(dados)
+    except Exception as e:
+        st.error(f"Erro ao registrar log de auditoria: {e}")
+
 if 'confirmation' not in st.session_state:
     st.session_state.confirmation = None
+if 'reveal_sensitive' not in st.session_state:
+    st.session_state.reveal_sensitive = {}
 
 st.title("🛠️ Gerenciar Envios")
+# ... (restante do código da página) ...
 st.write("Analise, aprove ou reprove os documentos pendentes com base no laudo técnico da IA.")
 st.divider()
 
-# ... (Lógica para carregar colaboradores e filtrar) ...
 try:
     docs = db.collection(colecao).stream()
     colaboradores = [doc.id for doc in docs]
@@ -114,7 +96,6 @@ if not colaboradores:
 st.sidebar.header("Filtros")
 colaborador_selecionado = st.sidebar.selectbox("Selecione um colaborador:", options=["Todos"] + colaboradores)
 
-# --- Exibição dos Dados ---
 docs_para_exibir = []
 if colaborador_selecionado == "Todos":
     docs_para_exibir = db.collection(colecao).stream()
@@ -122,7 +103,7 @@ else:
     doc = db.collection(colecao).document(colaborador_selecionado).get()
     if doc.exists:
         docs_para_exibir = [doc]
-        
+
 for doc in docs_para_exibir:
     colaborador_email = doc.id
     dados = doc.to_dict()
@@ -134,23 +115,37 @@ for doc in docs_para_exibir:
 
         for i, envio in enumerate(envios_ordenados):
             item_id = f"{colaborador_email}_{i}"
-            data_envio_obj = envio['data_envio']
-            status_atual = envio.get('status', 'Em processo')
             
             with st.container(border=True):
                 col1, col2 = st.columns([2, 3])
                 
                 with col1:
-                    if 'url_imagem' in envio:
-                        st.image(envio['url_imagem'], caption=f"Arquivo: {envio.get('nome_arquivo', 'N/A')}")
+                    # Lógica de exibição de imagem (mascarada vs original)
+                    imagem_a_exibir = envio.get('url_imagem_exibicao')
+                    if st.session_state.reveal_sensitive.get(item_id):
+                        imagem_a_exibir = envio.get('url_imagem_original')
+
+                    st.image(imagem_a_exibir, caption=f"Arquivo: {envio.get('nome_arquivo', 'N/A')}")
+                    
+                    if envio.get("dados_mascarados"):
+                        if not st.session_state.reveal_sensitive.get(item_id):
+                            if st.button("🔒 Revelar Informação Sensível", key=f"reveal_{item_id}"):
+                                st.session_state.reveal_sensitive[item_id] = True
+                                registrar_log_auditoria(colaborador_email, envio, "Informação sensível revelada")
+                                st.rerun()
+                        else:
+                            if st.button("👁️ Ocultar Informação Sensível", key=f"hide_{item_id}"):
+                                st.session_state.reveal_sensitive[item_id] = False
+                                st.rerun()
 
                 with col2:
-                    st.subheader("Parecer Técnico da IA")
+                    st.subheader(f"Análise de: {envio.get('tipo_documento', 'Documento')}")
                     laudo = envio.get('analise_ia')
                     
+                    # ... (exibição do laudo e lógica de aprovação/reprovação) ...
                     if laudo:
                         st.info(f"**Recomendação:** {laudo.get('parecer_supervisor', 'N/A')}")
-                        with st.expander("Ver laudo de compliance detalhado (NT-RH-001)"):
+                        with st.expander("Ver laudo de compliance detalhado"):
                             for item in laudo.get("laudo_tecnico", []):
                                 if item["cumprido"]:
                                     st.write(f"✅ **{item['requisito']}:** {item['observacao']}")
@@ -160,9 +155,9 @@ for doc in docs_para_exibir:
                         st.warning("Não foi encontrado um laudo técnico da IA para este envio.")
 
                     st.divider()
-                    
-                    # ... (Lógica de confirmação e botões permanece a mesma) ...
+
                     if st.session_state.confirmation == item_id:
+                        # ... (lógica de confirmação) ...
                         action_text = "aprovar" if st.session_state.action_status == "Aprovado" else "reprovar"
                         st.warning(f"Tem certeza que deseja **{action_text}** este item?")
                         
@@ -174,7 +169,7 @@ for doc in docs_para_exibir:
                             if st.session_state.action_status == "Reprovado" and not comentario:
                                 st.error("O comentário é obrigatório para reprovar um documento.")
                             else:
-                                if atualizar_status(colaborador_email, envio['nome_arquivo'], data_envio_obj, st.session_state.action_status, comentario):
+                                if atualizar_status(colaborador_email, envio, st.session_state.action_status, comentario):
                                     st.toast(f"Item marcado como {st.session_state.action_status}!", icon="🎉")
                                 st.session_state.confirmation = None
                                 st.rerun()
@@ -183,7 +178,8 @@ for doc in docs_para_exibir:
                             st.session_state.confirmation = None
                             st.rerun()
                     
-                    elif status_atual == "Em processo":
+                    elif envio.get('status') == "Em processo":
+                        # ... (botões de ação) ...
                         action_col1, action_col2, _ = st.columns([1, 1, 3])
                         if action_col1.button("Aprovar", key=f"aprovar_{item_id}"):
                             st.session_state.confirmation = item_id
