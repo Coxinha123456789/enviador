@@ -45,7 +45,7 @@ def analyze_compliance_with_gemini(image_bytes):
     Analisa a imagem de um atestado contra o regulamento da empresa, atuando como um auditor de compliance.
     Retorna um laudo técnico estruturado em JSON.
     """
-    try
+    try:
         # Recomendo usar um modelo mais robusto para esta tarefa
         model = genai.GenerativeModel(model_name='gemini-1.5-pro-latest') 
         image_pil = Image.open(io.BytesIO(image_bytes))
