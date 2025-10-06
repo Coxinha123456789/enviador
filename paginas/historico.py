@@ -10,7 +10,7 @@ db, _ = conectar_firebase()
 colecao = 'ColecaoEnviados'
 
 # --- Verificação de Login ---
-if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
+if not (hasattr(st, "user") and st.user.is_logged_in):
     st.warning("Faça login para ver seu histórico.")
     st.stop()
 
@@ -50,8 +50,16 @@ try:
                     col1, col2 = st.columns([2, 3])
                     
                     with col1:
-                        if 'url_imagem' in envio:
-                            st.image(envio['url_imagem'])
+                        # --- CORREÇÃO APLICADA AQUI ---
+                        # Lógica robusta para encontrar a URL da imagem em estruturas de dados novas e antigas.
+                        # Prioriza a 'url_imagem_exibicao' (nova) e usa 'url_imagem' (antiga) como fallback.
+                        url_para_exibir = envio.get('url_imagem_exibicao') or envio.get('url_imagem')
+
+                        if url_para_exibir:
+                            st.image(url_para_exibir)
+                        else:
+                            st.warning("Imagem não encontrada para este envio.")
+                        # --- FIM DA CORREÇÃO ---
                     
                     with col2:
                         st.write("**Linha do Tempo do Processo:**")
