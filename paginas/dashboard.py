@@ -84,7 +84,7 @@ with col1:
     })
     
     status_df['color'] = status_df['status'].map(color_map)
-    st.bar_chart(status_df.set_index('status'), y='quantidade', color='color')
+    st.bar_chart(status_df.set_index('status'), y='counts', color='color')
 
 with col2:
     st.subheader("Envios por Colaborador")
