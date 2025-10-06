@@ -73,9 +73,9 @@ with col1:
     status_counts = df['status'].value_counts()
     
     color_map = {
-        "Em processo": "#eab308",
-        "Aprovado": "#22c55e",
-        "Reprovado": "#ef4444"
+        "Em processo": "#ef4444",
+        "Aprovado": "#eab308",
+        "Reprovado": "#22c55e"
     }
     
     status_df = pd.DataFrame({
