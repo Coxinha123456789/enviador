@@ -1,4 +1,4 @@
-# No arquivo: paginas/pagina1.py (Versão Corrigida)
+# No arquivo: paginas/pagina1.py
 
 import streamlit as st
 import smtplib
@@ -10,16 +10,9 @@ import io
 import google.generativeai as genai
 from datetime import datetime
 from utils import conectar_firebase
-
-# --- Imports movidos para o topo ---
 from google.api_core.exceptions import Forbidden
 
-# --- Configuração da página ---
 st.set_page_config(layout="centered", page_title="Envio com IA")
-
-# -----------------------------------------------------------------------------
-# FUNÇÕES AUXILIARES (movidas para o topo para melhor organização)
-# -----------------------------------------------------------------------------
 
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
@@ -46,7 +39,6 @@ def send_emails(sender, password, supervisor, collaborator, subject, body, image
         msg_supervisor['To'] = supervisor
         msg_supervisor['Subject'] = subject
         msg_supervisor.attach(MIMEText(body, 'plain'))
-        # Anexa a imagem corretamente
         image = MIMEImage(image_bytes, name=image_name)
         msg_supervisor.attach(image)
         server.sendmail(sender, supervisor, msg_supervisor.as_string())
@@ -65,15 +57,30 @@ def send_emails(sender, password, supervisor, collaborator, subject, body, image
     except Exception as e:
         return False, f"Ocorreu um erro ao enviar os e-mails: {e}"
 
-# -----------------------------------------------------------------------------
-# LÓGICA PRINCIPAL DO APP
-# -----------------------------------------------------------------------------
+def upload_to_firebase_storage(image_bytes, user_email, file_name):
+    """Faz o upload da imagem para o Firebase Storage e retorna a URL pública."""
+    try:
+        # A função conectar_firebase agora retorna db e bucket
+        _, bucket = conectar_firebase()
+        
+        # Cria um caminho único para o arquivo no Storage
+        path = f"images/{user_email}/{file_name}"
+        blob = bucket.blob(path)
+        
+        # Faz o upload dos bytes da imagem
+        blob.upload_from_string(image_bytes, content_type='image/jpeg')
+        
+        # Torna o arquivo público e obtém a URL
+        blob.make_public()
+        return blob.public_url
+    except Exception as e:
+        st.error(f"Erro ao fazer upload para o Firebase Storage: {e}")
+        return None
 
-# 1. CORREÇÃO: Chamar a função e desempacotar os DOIS valores
-db = conectar_firebase()
+# --- LÓGICA PRINCIPAL ---
+db, _ = conectar_firebase() # Agora desempacotamos o bucket também, mas não usamos aqui
 colecao = 'ColecaoEnviados'
 
-# --- Carregamento de Segredos ---
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
@@ -84,12 +91,10 @@ except Exception as e:
     st.error(f"Erro fatal ao carregar segredos: {e}. Verifique o arquivo secrets.toml.")
     st.stop()
 
-# --- Verificação de Login ---
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
     st.warning("Faça login para continuar.")
     st.stop()
 
-# --- Interface Principal ---
 collaborator_email = getattr(st.user, "email", "não identificado")
 st.title("📤 App de Envio de Imagem")
 st.write(f"Você está logado como: **{collaborator_email}**")
@@ -111,43 +116,40 @@ if uploaded_file is not None:
         
         if st.button("🚀 Enviar para Supervisor"):
             with st.spinner("Enviando e salvando..."):
-                # Prepara os dados do e-mail
-                email_subject = f"Nova Imagem Recebida de {collaborator_email}"
-                email_body = f"""Olá,\n\nUma nova imagem foi enviada pelo colaborador {collaborator_email}.\n\nDescrição da imagem (IA):\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
+                # 1. Faz o upload da imagem para o Storage
+                image_url = upload_to_firebase_storage(image_bytes, collaborator_email, uploaded_file.name)
+                
+                if image_url:
+                    # 2. Envia os e-mails
+                    email_subject = f"Nova Imagem Recebida de {collaborator_email}"
+                    email_body = f"""Olá,\n\nUma nova imagem foi enviada pelo colaborador {collaborator_email}.\n\nDescrição da imagem (IA):\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
+                    
+                    email_ok, email_msg = send_emails(
+                        EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL, collaborator_email,
+                        email_subject, email_body, image_bytes, uploaded_file.name
+                    )
 
-                # 1. Envia os e-mails
-                email_ok, email_msg = send_emails(
-                    EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL, collaborator_email,
-                    email_subject, email_body, image_bytes, uploaded_file.name
-                )
+                    if email_ok:
+                        try:
+                            # 3. Salva as informações no Firestore, incluindo a URL da imagem
+                            user_ref = db.collection(colecao).document(collaborator_email)
+                            doc = user_ref.get()
+                            dados = doc.to_dict() if doc.exists else {}
 
-                # ... (código anterior) ...
+                            novo_envio = {
+                                "descricao": ai_description,
+                                "nome_arquivo": uploaded_file.name,
+                                "data_envio": datetime.now(),
+                                "url_imagem": image_url 
+                            }
+                            
+                            dados.setdefault('envios', []).append(novo_envio)
+                            user_ref.set(dados)
 
-                if email_ok:
-                    try:
-                        # --- Salva APENAS as informações no Firestore ---
-                        user_ref = db.collection(colecao).document(collaborator_email)
-                        doc = user_ref.get()
-                        dados = doc.to_dict() if doc.exists else {}
+                            st.success(f"{email_msg} Registro salvo com sucesso no banco de dados!")
+                            st.balloons()
 
-                        # Dicionário 'novo_envio' SIMPLIFICADO (sem a url_imagem)
-                        novo_envio = {
-                            "descricao": ai_description,
-                            "nome_arquivo": uploaded_file.name,
-                            "data_envio": datetime.now()
-                        }
-                        
-                        # Adiciona o novo envio à lista de envios do usuário
-                        dados.setdefault('envios', []).append(novo_envio)
-                        
-                        # Salva o documento inteiro de volta no Firestore
-                        user_ref.set(dados)
-
-                        st.success(f"{email_msg} Registro salvo com sucesso no banco de dados!")
-                        st.balloons()
-
-                    except Exception as e:
-                        # Mensagem de erro caso o salvamento no Firestore falhe
-                        st.error(f"E-mails enviados, mas falha ao salvar o registro no banco de dados: {e}")
-                else:
-                    st.error(f"Falha no envio de e-mails: {email_msg}")
+                        except Exception as e:
+                            st.error(f"E-mails enviados, mas falha ao salvar o registro no banco de dados: {e}")
+                    else:
+                        st.error(f"Falha no envio de e-mails: {email_msg}")
