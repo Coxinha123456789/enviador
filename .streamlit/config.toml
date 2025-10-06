@@ -1,7 +1,10 @@
 [theme]
-base="light"
-primaryColor="#003485"
-secondaryBackgroundColor="#d2ddff"
+base="dark"
+primaryColor="#3b82f6" # Um azul mais moderno
+backgroundColor="#0f172a" # Fundo azul escuro (slate)
+secondaryBackgroundColor="#1e293b" # Fundo secundário um pouco mais claro
+textColor="#e2e8f0" # Texto claro (off-white)
+font="sans serif"
 
 [client]
 toolbarMode = "viewer"
