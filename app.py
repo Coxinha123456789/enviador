@@ -21,7 +21,8 @@ def get_paginas(user_email):
         # Páginas para o colaborador
         return {
             "Colaborador": [
-                st.Page("paginas/pagina1.py", title="Banco de Dados", icon='📤')
+                st.Page("paginas/pagina1.py", title="Banco de Dados", icon='📤'),
+                st.Page("paginas/historico.py", title="Meu Histórico", icon='📜')
             ]
         }
 
