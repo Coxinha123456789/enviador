@@ -13,7 +13,7 @@ colecao = 'ColecaoEnviados'
 st.set_page_config(page_title="Gerenciar Envios", layout="wide")
 
 # --- Verificação de Acesso ---
-if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
+if not (hasattr(st, "user") and getattr(st, "is_logged_in", False)):
     st.warning("Você precisa fazer login como supervisor para acessar esta página.")
     st.stop()
 
@@ -23,18 +23,62 @@ if email_logado not in SUPERVISOR_EMAILS:
     st.error("Acesso negado. Esta página é restrita a supervisores.")
     st.stop()
 
-# --- Funções (sem alterações) ---
+# --- Funções ---
 def enviar_email_notificacao(colaborador_email, status, comentario, nome_arquivo):
-    # ... (código da função) ...
-    return True
+    try:
+        EMAIL_SENDER = st.secrets["EMAIL_SENDER"]
+        EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_SENDER
+        msg['To'] = colaborador_email
+        msg['Subject'] = f"Atualização de Status: Seu documento foi {status}"
+        corpo = f"""Olá,\n\nO status do seu documento "{nome_arquivo}" foi atualizado para: **{status}**.\n\nComentário do supervisor:\n--------------------------------------------------\n{comentario if comentario else "Nenhum comentário adicionado."}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
+        msg.attach(MIMEText(corpo, 'plain'))
+        server.sendmail(EMAIL_SENDER, colaborador_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Falha ao enviar e-mail de notificação: {e}")
+        return False
 
 def atualizar_status(colaborador_email, envio, novo_status, comentario):
-    # ... (código da função) ...
-    return True
+    try:
+        doc_ref = db.collection(colecao).document(colaborador_email)
+        doc = doc_ref.get()
+        if doc.exists:
+            dados = doc.to_dict()
+            envios = dados.get("envios", [])
+            for i, e in enumerate(envios):
+                if e['data_envio'] == envio['data_envio']:
+                    envios[i]['status'] = novo_status
+                    novo_log = {"status": f"{novo_status} pelo supervisor", "timestamp": datetime.now(), "comentario": comentario}
+                    envios[i].setdefault('log', []).append(novo_log)
+                    break
+            doc_ref.set(dados)
+            enviar_email_notificacao(colaborador_email, novo_status, comentario, envio['nome_arquivo'])
+            return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar status: {e}")
+        return False
 
 def registrar_log_auditoria(colaborador_email, envio, acao):
-    # ... (código da função) ...
-    pass
+    try:
+        doc_ref = db.collection(colecao).document(colaborador_email)
+        doc = doc_ref.get()
+        if doc.exists:
+            dados = doc.to_dict()
+            envios = dados.get("envios", [])
+            for i, e in enumerate(envios):
+                if e['data_envio'] == envio['data_envio']:
+                    novo_log = {"status": acao, "timestamp": datetime.now(), "comentario": f"Realizado por: {email_logado}"}
+                    envios[i].setdefault('log', []).append(novo_log)
+                    break
+            doc_ref.set(dados)
+    except Exception as e:
+        st.error(f"Erro ao registrar log de auditoria: {e}")
 
 # --- Inicialização do Estado ---
 if 'confirmation' not in st.session_state:
@@ -87,27 +131,20 @@ for doc in docs_para_exibir:
                 col1, col2 = st.columns([2, 3])
                 
                 with col1:
-                    # --- CORREÇÃO APLICADA AQUI ---
-                    # Lógica robusta para lidar com estruturas de dados antigas e novas
                     imagem_a_exibir = None
                     url_original = None
-
-                    # Prioriza a nova estrutura de dados
                     if 'url_imagem_exibicao' in envio:
                         imagem_a_exibir = envio.get('url_imagem_exibicao')
                         url_original = envio.get('url_imagem_original')
                         if st.session_state.reveal_sensitive.get(item_id):
                             imagem_a_exibir = url_original
-                    # Fallback para a estrutura antiga
                     elif 'url_imagem' in envio:
                         imagem_a_exibir = envio.get('url_imagem')
 
-                    # Só exibe a imagem se uma URL válida foi encontrada
                     if imagem_a_exibir:
                         st.image(imagem_a_exibir, caption=f"Arquivo: {envio.get('nome_arquivo', 'N/A')}")
                     else:
                         st.warning("URL da imagem não encontrada para este envio.")
-                    # --- FIM DA CORREÇÃO ---
                     
                     if envio.get("dados_mascarados"):
                         if not st.session_state.reveal_sensitive.get(item_id):
@@ -126,20 +163,48 @@ for doc in docs_para_exibir:
                     
                     if laudo:
                         st.info(f"**Recomendação:** {laudo.get('parecer_supervisor', 'N/A')}")
+                        # --- CÓDIGO RESTAURADO AQUI ---
                         with st.expander("Ver laudo de compliance detalhado"):
-                            # ... (código do laudo) ...
-                    elif 'descricao' in envio: # Compatibilidade com laudo antigo
+                            for item in laudo.get("laudo_tecnico", []):
+                                if item["cumprido"]:
+                                    st.write(f"✅ **{item['requisito']}:** {item['observacao']}")
+                                else:
+                                    st.write(f"❌ **{item['requisito']}:** {item['observacao']}")
+                        # --- FIM DO CÓDIGO RESTAURADO ---
+                    elif 'descricao' in envio:
                         st.info(f"**Parecer da IA (antigo):** {envio.get('descricao')}")
                     else:
                         st.warning("Não foi encontrado um laudo técnico da IA para este envio.")
 
                     st.divider()
 
-                    # Lógica de confirmação e botões
+                    status_atual = envio.get('status', 'Em processo')
                     if st.session_state.confirmation == item_id:
-                        # ... (código da confirmação) ...
-                        pass
+                        action_text = "aprovar" if st.session_state.action_status == "Aprovado" else "reprovar"
+                        st.warning(f"Tem certeza que deseja **{action_text}** este item?")
+                        comentario = st.text_area("Adicionar comentário (obrigatório para reprovação):", key=f"comment_{item_id}", height=100)
+                        confirm_col1, confirm_col2, _ = st.columns([1, 1, 3])
+                        
+                        if confirm_col1.button("✅ Sim, confirmar", key=f"sim_{item_id}"):
+                            if st.session_state.action_status == "Reprovado" and not comentario:
+                                st.error("O comentário é obrigatório para reprovar um documento.")
+                            else:
+                                if atualizar_status(colaborador_email, envio, st.session_state.action_status, comentario):
+                                    st.toast(f"Item marcado como {st.session_state.action_status}!", icon="🎉")
+                                st.session_state.confirmation = None
+                                st.rerun()
+
+                        if confirm_col2.button("❌ Não, cancelar", key=f"nao_{item_id}"):
+                            st.session_state.confirmation = None
+                            st.rerun()
                     
-                    elif envio.get('status') == "Em processo":
-                        # ... (código dos botões de ação) ...
-                        pass
+                    elif status_atual == "Em processo":
+                        action_col1, action_col2, _ = st.columns([1, 1, 3])
+                        if action_col1.button("Aprovar", key=f"aprovar_{item_id}"):
+                            st.session_state.confirmation = item_id
+                            st.session_state.action_status = "Aprovado"
+                            st.rerun()
+                        if action_col2.button("Reprovar", key=f"reprovar_{item_id}"):
+                            st.session_state.confirmation = item_id
+                            st.session_state.action_status = "Reprovado"
+                            st.rerun()
