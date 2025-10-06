@@ -47,7 +47,7 @@ def analyze_compliance_with_gemini(image_bytes):
     """
     try:
         # Recomendo usar um modelo mais robusto para esta tarefa
-        model = genai.GenerativeModel(model_name='gemini-1.5-pro-latest') 
+        model = genai.GenerativeModel(model_name='gemini-2.5-flash') 
         image_pil = Image.open(io.BytesIO(image_bytes))
         
         prompt = f"""
