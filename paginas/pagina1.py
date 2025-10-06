@@ -46,7 +46,7 @@ def analyze_compliance_with_gemini(image_bytes):
     Retorna um laudo técnico estruturado em JSON.
     """
     try:
-        model = genai.GenerativeModel(model_name='gemini-1.5-pro-latest') 
+        model = genai.GenerativeModel(model_name='gemini-2.5-flash') 
         image_pil = Image.open(io.BytesIO(image_bytes))
         
         prompt = f"""
