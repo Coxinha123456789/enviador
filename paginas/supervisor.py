@@ -7,6 +7,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+# ... (Conexão e verificação de acesso permanecem iguais) ...
 # --- Conexão com Firebase ---
 db, _ = conectar_firebase()
 colecao = 'ColecaoEnviados'
@@ -90,13 +91,12 @@ def atualizar_status(colaborador_email, nome_arquivo, data_envio, novo_status, c
         st.error(f"Erro ao atualizar status: {e}")
         return False
 
-# --- Inicialização do Estado da Sessão ---
+# ... (Inicialização do estado e layout permanecem os mesmos) ...
 if 'confirmation' not in st.session_state:
     st.session_state.confirmation = None
 
-# --- Layout da Página ---
 st.title("🛠️ Gerenciar Envios")
-st.write("Analise, aprove ou reprove os documentos pendentes.")
+st.write("Analise, aprove ou reprove os documentos pendentes com base no laudo técnico da IA.")
 st.divider()
 
 # ... (Lógica para carregar colaboradores e filtrar) ...
@@ -122,7 +122,7 @@ else:
     doc = db.collection(colecao).document(colaborador_selecionado).get()
     if doc.exists:
         docs_para_exibir = [doc]
-
+        
 for doc in docs_para_exibir:
     colaborador_email = doc.id
     dados = doc.to_dict()
@@ -135,7 +135,6 @@ for doc in docs_para_exibir:
         for i, envio in enumerate(envios_ordenados):
             item_id = f"{colaborador_email}_{i}"
             data_envio_obj = envio['data_envio']
-            data_formatada = data_envio_obj.strftime('%d/%m/%Y às %H:%M')
             status_atual = envio.get('status', 'Em processo')
             
             with st.container(border=True):
@@ -146,35 +145,46 @@ for doc in docs_para_exibir:
                         st.image(envio['url_imagem'], caption=f"Arquivo: {envio.get('nome_arquivo', 'N/A')}")
 
                 with col2:
-                    st.write(f"**Enviado em:** {data_formatada}")
+                    st.subheader("Parecer Técnico da IA")
+                    laudo = envio.get('analise_ia')
                     
-                    if status_atual == 'Aprovado': st.markdown(f"**Status:** <span style='color: #22c55e;'>🟢 Aprovado</span>", unsafe_allow_html=True)
-                    elif status_atual == 'Reprovado': st.markdown(f"**Status:** <span style='color: #ef4444;'>🔴 Reprovado</span>", unsafe_allow_html=True)
-                    else: st.markdown(f"**Status:** <span style='color: #eab308;'>🟡 Em processo</span>", unsafe_allow_html=True)
+                    if laudo:
+                        st.info(f"**Recomendação:** {laudo.get('parecer_supervisor', 'N/A')}")
+                        with st.expander("Ver laudo de compliance detalhado (NT-RH-001)"):
+                            for item in laudo.get("laudo_tecnico", []):
+                                if item["cumprido"]:
+                                    st.write(f"✅ **{item['requisito']}:** {item['observacao']}")
+                                else:
+                                    st.write(f"❌ **{item['requisito']}:** {item['observacao']}")
+                    else:
+                        st.warning("Não foi encontrado um laudo técnico da IA para este envio.")
 
-                    st.write("**Parecer da IA:**")
-                    st.info(envio.get("descricao", "Nenhuma descrição."))
-
+                    st.divider()
+                    
+                    # ... (Lógica de confirmação e botões permanece a mesma) ...
                     if st.session_state.confirmation == item_id:
                         action_text = "aprovar" if st.session_state.action_status == "Aprovado" else "reprovar"
                         st.warning(f"Tem certeza que deseja **{action_text}** este item?")
                         
-                        comentario = st.text_area("Adicionar comentário (opcional):", key=f"comment_{item_id}", height=100)
+                        comentario = st.text_area("Adicionar comentário (obrigatório para reprovação):", key=f"comment_{item_id}", height=100)
                         
-                        confirm_col1, confirm_col2, _ = st.columns([1, 1, 4])
+                        confirm_col1, confirm_col2, _ = st.columns([1, 1, 3])
                         
                         if confirm_col1.button("✅ Sim, confirmar", key=f"sim_{item_id}"):
-                            if atualizar_status(colaborador_email, envio['nome_arquivo'], data_envio_obj, st.session_state.action_status, comentario):
-                                st.toast(f"Item marcado como {st.session_state.action_status}!", icon="🎉")
-                            st.session_state.confirmation = None
-                            st.rerun()
+                            if st.session_state.action_status == "Reprovado" and not comentario:
+                                st.error("O comentário é obrigatório para reprovar um documento.")
+                            else:
+                                if atualizar_status(colaborador_email, envio['nome_arquivo'], data_envio_obj, st.session_state.action_status, comentario):
+                                    st.toast(f"Item marcado como {st.session_state.action_status}!", icon="🎉")
+                                st.session_state.confirmation = None
+                                st.rerun()
 
                         if confirm_col2.button("❌ Não, cancelar", key=f"nao_{item_id}"):
                             st.session_state.confirmation = None
                             st.rerun()
                     
                     elif status_atual == "Em processo":
-                        action_col1, action_col2, _ = st.columns([1, 1, 4])
+                        action_col1, action_col2, _ = st.columns([1, 1, 3])
                         if action_col1.button("Aprovar", key=f"aprovar_{item_id}"):
                             st.session_state.confirmation = item_id
                             st.session_state.action_status = "Aprovado"
