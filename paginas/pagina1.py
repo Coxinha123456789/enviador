@@ -119,7 +119,7 @@ def mask_sensitive_data(image_bytes, bbox):
 def analyze_document_with_gemini(image_bytes, doc_type):
     """Chama a IA com o prompt correto para o tipo de documento."""
     try:
-        model = genai.GenerativeModel(model_name='gemini-1.5-pro-latest')
+        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = DOCUMENT_RULES[doc_type]["prompt_ia"]
         
