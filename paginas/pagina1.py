@@ -14,12 +14,12 @@ from google.api_core.exceptions import Forbidden
 
 st.set_page_config(layout="centered", page_title="Envio de Documentos")
 
-# ... (o resto das suas funções `analyze_image_with_gemini`, `send_emails`, `upload_to_firebase_storage` permanecem iguais) ...
+# ... (as funções analyze_image_with_gemini, send_emails, upload_to_firebase_storage permanecem as mesmas) ...
 
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
     try:
-        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
+        model = genai.GenerativeModel(model_name='gemini-1.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = """
         Aja como uma assistente profissional para um supervisor. A imagem a seguir é um documento enviado por um colaborador (como um atestado médico, um recibo para reembolso, etc.). 
@@ -104,6 +104,12 @@ st.write(f"Logado como: **{collaborator_email}**")
 st.write("Faça o upload de um documento (atestado, recibo, etc.) para análise e aprovação.")
 st.divider()
 
+# Inicializa o estado da sessão se não existir
+if 'ai_description' not in st.session_state:
+    st.session_state.ai_description = None
+if 'current_file_id' not in st.session_state:
+    st.session_state.current_file_id = None
+
 with st.container(border=True):
     uploaded_file = st.file_uploader(
         "Selecione o arquivo de imagem", 
@@ -112,6 +118,8 @@ with st.container(border=True):
     )
 
 if uploaded_file is not None:
+    # Cria um identificador único para o arquivo para saber se ele mudou
+    file_id = f"{uploaded_file.name}-{uploaded_file.size}"
     image_bytes = uploaded_file.getvalue()
     
     with st.container(border=True):
@@ -120,8 +128,15 @@ if uploaded_file is not None:
 
     with st.container(border=True):
         st.subheader("🤖 Análise e Parecer da IA")
-        with st.spinner("Analisando o documento..."):
-            ai_description = analyze_image_with_gemini(image_bytes)
+
+        # Só executa a análise se o arquivo for novo
+        if file_id != st.session_state.current_file_id:
+            with st.spinner("Analisando o documento..."):
+                st.session_state.ai_description = analyze_image_with_gemini(image_bytes)
+                st.session_state.current_file_id = file_id
+        
+        # Usa a descrição armazenada na sessão
+        ai_description = st.session_state.ai_description
         
         if ai_description:
             st.text_area("Parecer gerado:", value=ai_description, height=150, disabled=True)
