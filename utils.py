@@ -1,21 +1,23 @@
-# Dentro do arquivo: utils.py (Versão Simplificada)
+# Dentro do arquivo: utils.py
 
 import streamlit as st
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 
 @st.cache_resource
 def conectar_firebase():
     """
-    Inicializa o Firebase e retorna APENAS o cliente do Firestore.
+    Inicializa o Firebase e retorna o cliente do Firestore e o bucket do Storage.
     """
     try:
         firebase_admin.get_app()
     except ValueError:
-        # A inicialização não precisa mais da opção 'storageBucket'
         cred = credentials.Certificate(dict(st.secrets["firebase"]))
-        firebase_admin.initialize_app(cred)
+        # Adicione a URL do seu bucket do Storage aqui
+        firebase_admin.initialize_app(cred, {
+            'storageBucket': st.secrets["firebase"]["storage_bucket_url"]
+        })
     
-    # Retorna apenas o cliente do Firestore
     db = firestore.client()
-    return db
+    bucket = storage.bucket()
+    return db, bucket
