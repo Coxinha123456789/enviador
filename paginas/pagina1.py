@@ -149,4 +149,34 @@ if uploaded_file is not None:
                     
                     if image_url:
                         email_subject = f"Novo Documento Recebido de {collaborator_email}"
-                        email_body = f"""Olá,\n\nUm novo documento foi enviado por {collaborator_email}.\n\nParecer da IA:\n----------------
+                        email_body = f"""Olá,\n\nUm novo documento foi enviado por {collaborator_email}.\n\nParecer da IA:\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"""
+                        
+                        email_ok, email_msg = send_emails(
+                            EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL, collaborator_email,
+                            email_subject, email_body, image_bytes, uploaded_file.name
+                        )
+
+                        if email_ok:
+                            try:
+                                user_ref = db.collection(colecao).document(collaborator_email)
+                                doc = user_ref.get()
+                                dados = doc.to_dict() if doc.exists else {}
+
+                                novo_envio = {
+                                    "descricao": ai_description,
+                                    "nome_arquivo": uploaded_file.name,
+                                    "data_envio": datetime.now(),
+                                    "url_imagem": image_url,
+                                    "status": "Em processo"
+                                }
+                                
+                                dados.setdefault('envios', []).append(novo_envio)
+                                user_ref.set(dados)
+
+                                st.success(f"{email_msg} Registro salvo com sucesso!")
+                                st.balloons()
+                            except Exception as e:
+                                st.error(f"E-mails enviados, mas falha ao salvar o registro: {e}")
+                        else:
+                            st.error(f"Falha no envio de e-mails: {email_msg}")
+        # Se a análise falhou, st.error já terá sido chamado dentro de analyze_image_with_gemini
