@@ -14,21 +14,21 @@ from google.api_core.exceptions import Forbidden
 
 st.set_page_config(layout="centered", page_title="Envio de Documentos")
 
-# ... (o resto das suas funções `analyze_image_with_gemini`, `send_emails`, `upload_to_firebase_storage` permanecem iguais) ...
-
 def analyze_image_with_gemini(image_bytes):
-    """Analisa uma imagem usando o Gemini e retorna uma descrição."""
+    """Analisa uma imagem, gera um parecer e verifica a conformidade."""
     try:
-        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
+        model = genai.GenerativeModel(model_name='gemini-pro-vision')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = """
-        Aja como uma assistente profissional para um supervisor. A imagem a seguir é um documento enviado por um colaborador (como um atestado médico, um recibo para reembolso, etc.). 
-        Sua tarefa é analisar a imagem e fornecer um breve parecer para o supervisor, destacando as informações mais importantes e sugerindo se o documento parece estar em conformidade para aprovação.
+        Aja como uma assistente de compliance para um supervisor. A imagem é um documento enviado por um colaborador (ex: atestado médico).
+        Sua tarefa é dupla:
+        1.  **Fornecer um parecer conciso (máximo 4 linhas):** Descreva o tipo de documento, as informações chave (datas, nomes, etc.) e uma recomendação inicial.
+        2.  **Analisar a Conformidade:** Verifique a imagem em busca de possíveis alertas, como:
+            - A imagem parece ser uma captura de tela ou tem baixa resolução?
+            - Faltam informações cruciais (ex: assinatura do médico, carimbo, data clara)?
+            - Há algo que pareça inconsistente ou que exija atenção especial?
         
-        Seu parecer deve ser objetivo e conciso (máximo de 4 linhas), contendo:
-        1. O tipo de documento que parece ser.
-        2. As informações chave contidas nele (ex: datas, valores, nomes).
-        3. Uma recomendação inicial (ex: "Parece legítimo para aprovação", "Requer verificação adicional", "Informações parecem inconsistentes").
+        Adicione um campo 'Alerta de Conformidade' ao final se encontrar algo suspeito. Se tudo parecer correto, indique 'Nenhum alerta detectado'.
         """
         response = model.generate_content([prompt, image_pil])
         return response.text
@@ -43,7 +43,7 @@ def send_emails(sender, password, supervisor, collaborator, subject, body, image
         server.starttls()
         server.login(sender, password)
 
-        # --- E-mail para o Supervisor ---
+        # E-mail para o Supervisor
         msg_supervisor = MIMEMultipart()
         msg_supervisor['From'] = sender
         msg_supervisor['To'] = supervisor
@@ -53,12 +53,12 @@ def send_emails(sender, password, supervisor, collaborator, subject, body, image
         msg_supervisor.attach(image)
         server.sendmail(sender, supervisor, msg_supervisor.as_string())
 
-        # --- E-mail de Confirmação para o Colaborador ---
+        # E-mail de Confirmação para o Colaborador
         msg_collaborator = MIMEMultipart()
         msg_collaborator['From'] = sender
         msg_collaborator['To'] = collaborator
         msg_collaborator['Subject'] = "Confirmação de Envio de Documento"
-        body_collaborator = "Olá,\n\nEste é um e-mail de confirmação. Seu documento e a análise da IA foram enviados com sucesso para seu supervisor.\n\nAtenciosamente,\nSistema Automático"
+        body_collaborator = "Olá,\n\nSeu documento e a análise da IA foram enviados com sucesso para seu supervisor. Você será notificado sobre o status assim que for avaliado.\n\nAtenciosamente,\nSistema Automático"
         msg_collaborator.attach(MIMEText(body_collaborator, 'plain'))
         server.sendmail(sender, collaborator, msg_collaborator.as_string())
         
@@ -117,3 +117,56 @@ if uploaded_file is not None:
     with st.container(border=True):
         st.subheader("Visualização")
         st.image(image_bytes, caption=f"Arquivo: {uploaded_file.name}", use_container_width=True)
+
+    with st.container(border=True):
+        st.subheader("🤖 Análise e Parecer da IA")
+        with st.spinner("Analisando o documento..."):
+            ai_description = analyze_image_with_gemini(image_bytes)
+        
+        if ai_description:
+            st.text_area("Parecer gerado:", value=ai_description, height=200, disabled=True)
+            
+            if st.button("🚀 Enviar para Supervisor", use_container_width=True, type="primary"):
+                with st.spinner("Enviando e salvando..."):
+                    image_url = upload_to_firebase_storage(image_bytes, collaborator_email, uploaded_file.name)
+                    
+                    if image_url:
+                        email_subject = f"Novo Documento Recebido de {collaborator_email}"
+                        email_body = f"Olá,\n\nUm novo documento foi enviado por {collaborator_email}.\n\nParecer da IA:\n--------------------------------------------------\n{ai_description}\n--------------------------------------------------\n\nAtenciosamente,\nSistema Automático"
+                        
+                        email_ok, email_msg = send_emails(
+                            EMAIL_SENDER, EMAIL_PASSWORD, SUPERVISOR_EMAIL, collaborator_email,
+                            email_subject, email_body, image_bytes, uploaded_file.name
+                        )
+
+                        if email_ok:
+                            try:
+                                user_ref = db.collection(colecao).document(collaborator_email)
+                                doc = user_ref.get()
+                                dados = doc.to_dict() if doc.exists else {}
+
+                                novo_envio = {
+                                    "descricao": ai_description,
+                                    "nome_arquivo": uploaded_file.name,
+                                    "data_envio": datetime.now(),
+                                    "url_imagem": image_url,
+                                    "status": "Em processo",
+                                    "log": [
+                                        {
+                                            "status": "Enviado pelo colaborador",
+                                            "timestamp": datetime.now(),
+                                            "comentario": ""
+                                        }
+                                    ]
+                                }
+                                
+                                dados.setdefault('envios', []).append(novo_envio)
+                                user_ref.set(dados)
+
+                                st.success(f"{email_msg} Registro salvo com sucesso!")
+                                st.toast("🚀 Enviado com sucesso!", icon="🚀")
+                                st.balloons()
+                            except Exception as e:
+                                st.error(f"E-mails enviados, mas falha ao salvar o registro: {e}")
+                        else:
+                            st.error(f"Falha no envio de e-mails: {email_msg}")
