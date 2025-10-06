@@ -7,27 +7,30 @@ from datetime import timedelta
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 
-# ... (conexão e verificação de acesso) ...
+# --- Conexão com Firebase ---
 db, _ = conectar_firebase()
 colecao = 'ColecaoEnviados'
+
+# --- Verificação de Acesso ---
+# CORREÇÃO APLICADA AQUI: trocado st por st.user
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
     st.warning("Você precisa fazer login como supervisor para acessar esta página.")
     st.stop()
+
 email_logado = getattr(st.user, "email", "").lower()
 SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"]
+
 if email_logado not in SUPERVISOR_EMAILS:
     st.error("Acesso negado. Esta página é restrita a supervisores.")
     st.stop()
 
-
+# --- Restante do código (sem alterações) ... ---
 st.title(f"📊 Dashboard de Análise de Processos")
 st.write(f"Bem-vindo, {getattr(st.user, 'name', 'Supervisor')}. Monitore a eficiência e a conformidade dos envios.")
 st.divider()
 
-# --- Carregar e Processar Dados ---
 @st.cache_data(ttl=300)
 def carregar_dados():
-    # ... (código para carregar dados) ...
     todos_envios = []
     docs = db.collection(colecao).stream()
     for doc in docs:
@@ -45,7 +48,6 @@ if not envios_globais:
     st.info("Ainda não há dados de envios para exibir no dashboard.")
     st.stop()
 
-# ... (métricas principais) ...
 total_envios = len(envios_globais)
 pendentes = sum(1 for e in envios_globais if e.get('status') == 'Em processo')
 aprovados = sum(1 for e in envios_globais if e.get('status') == 'Aprovado')
@@ -62,7 +64,6 @@ st.divider()
 df = pd.DataFrame(envios_globais)
 df['data_envio'] = pd.to_datetime(df['data_envio'])
 
-# --- NOVA SEÇÃO: ANÁLISE DE CAUSA RAIZ ---
 st.subheader("Análise de Causa Raiz de Não Conformidade")
 
 nao_conformes = [
@@ -81,28 +82,14 @@ else:
 
 st.divider()
 
-
-# --- Gráficos Anteriores ---
-# ... (código dos gráficos de status, colaborador e atividade recente) ...
 df['data'] = df['data_envio'].dt.date
-
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Envios por Status")
     status_counts = df['status'].value_counts()
-    
-    color_map = {
-        "Em processo": "#eab308",    
-        "Aprovado": "#22c55e",       
-        "Reprovado": "#ef4444"       
-    }
-    
-    status_df = pd.DataFrame({
-        'status': status_counts.index,
-        'count': status_counts.values
-    })
-    
+    color_map = {"Em processo": "#eab308", "Aprovado": "#22c55e", "Reprovado": "#ef4444"}
+    status_df = pd.DataFrame({'status': status_counts.index, 'count': status_counts.values})
     status_df['color'] = status_df['status'].map(color_map)
     st.bar_chart(status_df.set_index('status'), y='count', color='color')
 
