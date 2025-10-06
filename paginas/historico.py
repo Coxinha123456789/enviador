@@ -30,18 +30,27 @@ try:
         envios = dados.get("envios", [])
 
         if envios:
-            # Ordena os envios por data, do mais recente para o mais antigo
             envios_ordenados = sorted(
                 [e for e in envios if 'data_envio' in e],
                 key=lambda x: x['data_envio'],
                 reverse=True
             )
 
-            # Exibe cada envio
             for envio in envios_ordenados:
                 data_formatada = envio['data_envio'].strftime('%d/%m/%Y %H:%M')
-                st.subheader(f"Enviado em: {data_formatada}")
+                status = envio.get('status', 'Em processo') # Pega o status, com 'Em processo' como padrão
                 
+                # Define cor e ícone com base no status
+                if status == 'Aprovado':
+                    status_display = f"Status: 🟢 **{status}**"
+                elif status == 'Reprovado':
+                    status_display = f"Status: 🔴 **{status}**"
+                else:
+                    status_display = f"Status: 🟡 **{status}**"
+                
+                st.subheader(f"Enviado em: {data_formatada}")
+                st.markdown(status_display)
+
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -49,7 +58,7 @@ try:
                         st.image(envio['url_imagem'], caption=envio.get('nome_arquivo', ''))
                 
                 with col2:
-                    st.write("**Descrição da IA:**")
+                    st.write("**Parecer da IA:**")
                     st.info(envio.get("descricao", "Nenhuma descrição."))
                 
                 st.divider()
