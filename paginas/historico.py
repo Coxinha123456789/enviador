@@ -18,7 +18,8 @@ collaborator_email = getattr(st.user, "email", "não identificado")
 
 # --- Layout ---
 st.title("📜 Meu Histórico de Envios")
-st.write(f"Aqui estão todas as imagens que você, **{collaborator_email}**, já enviou.")
+st.write(f"Acompanhe o status dos documentos que você enviou, **{collaborator_email}**.")
+st.divider()
 
 # --- Busca os dados no Firestore ---
 try:
@@ -36,37 +37,35 @@ try:
                 reverse=True
             )
 
+            # Exibe cada envio
             for envio in envios_ordenados:
-                data_formatada = envio['data_envio'].strftime('%d/%m/%Y %H:%M')
-                status = envio.get('status', 'Em processo') # Pega o status, com 'Em processo' como padrão
-                
-                # Define cor e ícone com base no status
-                if status == 'Aprovado':
-                    status_display = f"Status: 🟢 **{status}**"
-                elif status == 'Reprovado':
-                    status_display = f"Status: 🔴 **{status}**"
-                else:
-                    status_display = f"Status: 🟡 **{status}**"
-                
-                st.subheader(f"Enviado em: {data_formatada}")
-                st.markdown(status_display)
-
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if 'url_imagem' in envio:
-                        st.image(envio['url_imagem'], caption=envio.get('nome_arquivo', ''))
-                
-                with col2:
-                    st.write("**Parecer da IA:**")
-                    st.info(envio.get("descricao", "Nenhuma descrição."))
-                
-                st.divider()
-
+                with st.container(border=True):
+                    data_formatada = envio['data_envio'].strftime('%d/%m/%Y às %H:%M')
+                    status = envio.get('status', 'Em processo')
+                    
+                    st.subheader(f"Enviado em: {data_formatada}")
+                    
+                    # Define cor e ícone com base no status
+                    if status == 'Aprovado':
+                        st.markdown(f"**Status:** <span style='color: #22c55e;'>🟢 Aprovado</span>", unsafe_allow_html=True)
+                    elif status == 'Reprovado':
+                        st.markdown(f"**Status:** <span style='color: #ef4444;'>🔴 Reprovado</span>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"**Status:** <span style='color: #eab308;'>🟡 Em processo</span>", unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        if 'url_imagem' in envio:
+                            st.image(envio['url_imagem'], caption=envio.get('nome_arquivo', ''))
+                    
+                    with col2:
+                        st.write("**Parecer da IA:**")
+                        st.info(envio.get("descricao", "Nenhuma descrição."))
         else:
-            st.info("Você ainda não enviou nenhuma imagem.")
+            st.info("Você ainda não enviou nenhum documento.")
     else:
-        st.info("Você ainda não enviou nenhuma imagem.")
+        st.info("Você ainda não enviou nenhum documento.")
 
 except Exception as e:
     st.error(f"Ocorreu um erro ao buscar seu histórico: {e}")
