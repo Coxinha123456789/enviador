@@ -3,6 +3,7 @@
 import streamlit as st
 from utils import conectar_firebase
 import pandas as pd
+from datetime import timedelta
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 
@@ -27,7 +28,7 @@ st.write(f"Bem-vindo, {getattr(st.user, 'name', 'Supervisor')}. Aqui está um re
 st.divider()
 
 # --- Carregar e Processar Dados ---
-@st.cache_data(ttl=300) # Reduzi o TTL para 5 minutos para atualizações mais frequentes
+@st.cache_data(ttl=300)
 def carregar_dados():
     todos_envios = []
     docs = db.collection(colecao).stream()
@@ -71,33 +72,38 @@ with col1:
     st.subheader("Envios por Status")
     status_counts = df['status'].value_counts()
     
-    # --- CORREÇÃO APLICADA AQUI ---
-    # Mapeia os status para cores específicas para garantir consistência
     color_map = {
-        "Em processo": "#eab308", # Amarelo
-        "Aprovado": "#22c55e",    # Verde
-        "Reprovado": "#ef4444"    # Vermelho
+        "Em processo": "#eab308",
+        "Aprovado": "#22c55e",
+        "Reprovado": "#ef4444"
     }
     
-    # Cria um novo DataFrame para o gráfico, garantindo a ordem e as cores
     status_df = pd.DataFrame({
         'status': status_counts.index,
         'count': status_counts.values
     })
     
-    # Adiciona a coluna de cores com base no mapa
     status_df['color'] = status_df['status'].map(color_map)
-    
-    # Plota o gráfico usando as cores definidas por linha
     st.bar_chart(status_df.set_index('status'), y='count', color='color')
-    # --- FIM DA CORREÇÃO ---
 
 with col2:
     st.subheader("Envios por Colaborador")
     colaborador_counts = df['colaborador'].value_counts()
     st.bar_chart(colaborador_counts)
 
+# --- CORREÇÃO APLICADA AQUI ---
 st.subheader("Atividade Recente (Últimos 7 dias)")
-ultimos_7_dias = df[df['data_envio'] >= (pd.to_datetime('today') - pd.Timedelta(days=7))]
+
+# 1. Pega a data e hora de agora e já define o fuso horário como UTC
+hoje_utc = pd.Timestamp.now(tz='UTC')
+
+# 2. Calcula a data de 7 dias atrás, mantendo o fuso horário UTC
+limite_data = hoje_utc - timedelta(days=7)
+
+# 3. Compara as duas datas, que agora são ambas "conscientes" do fuso horário UTC
+ultimos_7_dias = df[df['data_envio'] >= limite_data]
+
+# O restante do código funciona como antes
 envios_por_dia = ultimos_7_dias.groupby('data').size()
 st.line_chart(envios_por_dia)
+# --- FIM DA CORREÇÃO ---
