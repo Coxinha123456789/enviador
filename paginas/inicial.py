@@ -1,26 +1,21 @@
-# No arquivo: paginas/inicial.py
-
 import streamlit as st
 from utils import conectar_firebase
 
 st.set_page_config(page_title="Início", layout="wide")
 
-# --- Verificação de Login ---
 if not (hasattr(st, "user") and st.user.is_logged_in):
     st.title("Bem-vindo(a) à Plataforma de Gestão de Documentos")
     st.write("Faça o login para continuar.")
     if st.button("Log in", type="primary"):
         st.login()
-    st.stop()
+    st.stop() 
 
-# --- Conexão com Firebase e Definições ---
 db, _ = conectar_firebase()
-SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"] # Mantenha esta lista sincronizada com app.py
+SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"] 
 user_email = getattr(st.user, "email", "").lower()
 user_name = getattr(st.user, "name", "Usuário")
 
-# --- Funções de busca de dados ---
-@st.cache_data(ttl=120) # Cache de 2 minutos para evitar leituras excessivas
+@st.cache_data(ttl=120)
 def get_supervisor_stats():
     """Busca o número total de envios pendentes para todos os colaboradores."""
     pendentes = 0
@@ -49,10 +44,8 @@ def get_collaborator_stats(email):
         st.error(f"Não foi possível carregar suas estatísticas: {e}")
     return stats
 
-# --- Renderização da Página ---
 st.title(f"Bem-vindo(a), {user_name}!")
 
-# Adiciona informações do usuário na barra lateral
 with st.sidebar:
     st.header("Perfil")
     if hasattr(st.user, 'picture'):
@@ -62,10 +55,7 @@ with st.sidebar:
         st.logout()
     st.divider()
 
-
-# --- Exibição Condicional (Supervisor vs Colaborador) ---
 if user_email in SUPERVISOR_EMAILS:
-    # --- VISÃO DO SUPERVISOR ---
     st.subheader("Portal do Supervisor")
     pendentes_total = get_supervisor_stats()
 
@@ -87,7 +77,6 @@ if user_email in SUPERVISOR_EMAILS:
             st.page_link("paginas/supervisor.py", label="Gerenciar Documentos", icon="🛠️")
 
 else:
-    # --- VISÃO DO COLABORADOR ---
     st.subheader("Seu Resumo")
     stats = get_collaborator_stats(user_email)
 
