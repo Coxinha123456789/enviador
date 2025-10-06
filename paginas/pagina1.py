@@ -14,7 +14,7 @@ from google.api_core.exceptions import Forbidden
 
 st.set_page_config(layout="centered", page_title="Envio de Documentos")
 
-# ... (as funções analyze_image_with_gemini, send_emails, upload_to_firebase_storage permanecem as mesmas) ...
+# ... (o resto das suas funções `analyze_image_with_gemini`, `send_emails`, `upload_to_firebase_storage` permanecem iguais) ...
 
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
@@ -94,11 +94,26 @@ except Exception as e:
     st.error(f"Erro fatal ao carregar segredos: {e}. Verifique o arquivo secrets.toml.")
     st.stop()
 
-# --- CORREÇÃO APLICADA AQUI ---
 if not (hasattr(st, "user") and getattr(st.user, "is_logged_in", False)):
     st.warning("Faça login para continuar.")
     st.stop()
 
 collaborator_email = getattr(st.user, "email", "não identificado")
 st.title("📤 Envio de Documentos")
-st.write(f"Logado como: **{collaborator_email}
+st.write(f"Logado como: **{collaborator_email}**")
+st.write("Faça o upload de um documento (atestado, recibo, etc.) para análise e aprovação.")
+st.divider()
+
+with st.container(border=True):
+    uploaded_file = st.file_uploader(
+        "Selecione o arquivo de imagem", 
+        type=["png", "jpg", "jpeg"],
+        label_visibility="collapsed"
+    )
+
+if uploaded_file is not None:
+    image_bytes = uploaded_file.getvalue()
+    
+    with st.container(border=True):
+        st.subheader("Visualização")
+        st.image(image_bytes, caption=f"Arquivo: {uploaded_file.name}", use_container_width=True)
