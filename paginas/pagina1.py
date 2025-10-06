@@ -17,7 +17,7 @@ st.set_page_config(layout="centered", page_title="Envio de Documentos")
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem, gera um parecer e verifica a conformidade."""
     try:
-        model = genai.GenerativeModel(model_name='gemini-pro-vision')
+        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = """
         Aja como uma assistente de compliance para um supervisor. A imagem é um documento enviado por um colaborador (ex: atestado médico).
