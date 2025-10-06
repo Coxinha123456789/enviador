@@ -19,7 +19,7 @@ st.set_page_config(layout="centered", page_title="Envio de Documentos")
 def analyze_image_with_gemini(image_bytes):
     """Analisa uma imagem usando o Gemini e retorna uma descrição."""
     try:
-        model = genai.GenerativeModel(model_name='gemini-pro-vision')
+        model = genai.GenerativeModel(model_name='gemini-2.5-flash')
         image_pil = Image.open(io.BytesIO(image_bytes))
         prompt = """
         Aja como uma assistente profissional para um supervisor. A imagem a seguir é um documento enviado por um colaborador (como um atestado médico, um recibo para reembolso, etc.). 
