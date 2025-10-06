@@ -27,7 +27,7 @@ st.write(f"Bem-vindo, {getattr(st.user, 'name', 'Supervisor')}. Aqui está um re
 st.divider()
 
 # --- Carregar e Processar Dados ---
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300) # Reduzi o TTL para 5 minutos para atualizações mais frequentes
 def carregar_dados():
     todos_envios = []
     docs = db.collection(colecao).stream()
@@ -70,7 +70,27 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Envios por Status")
     status_counts = df['status'].value_counts()
-    st.bar_chart(status_counts, color=["#eab308", "#22c55e", "#ef4444"]) # Amarelo, Verde, Vermelho
+    
+    # --- CORREÇÃO APLICADA AQUI ---
+    # Mapeia os status para cores específicas para garantir consistência
+    color_map = {
+        "Em processo": "#eab308", # Amarelo
+        "Aprovado": "#22c55e",    # Verde
+        "Reprovado": "#ef4444"    # Vermelho
+    }
+    
+    # Cria um novo DataFrame para o gráfico, garantindo a ordem e as cores
+    status_df = pd.DataFrame({
+        'status': status_counts.index,
+        'count': status_counts.values
+    })
+    
+    # Adiciona a coluna de cores com base no mapa
+    status_df['color'] = status_df['status'].map(color_map)
+    
+    # Plota o gráfico usando as cores definidas por linha
+    st.bar_chart(status_df.set_index('status'), y='count', color='color')
+    # --- FIM DA CORREÇÃO ---
 
 with col2:
     st.subheader("Envios por Colaborador")
