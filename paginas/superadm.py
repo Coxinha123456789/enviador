@@ -12,7 +12,7 @@ db, _ = conectar_firebase()
 users_collection = db.collection('users')
 
 # Defina o e-mail do Super Admin. SOMENTE ESTE E-MAIL PODERÁ ACESSAR ESTA PÁGINA.
-SUPERADMIN_EMAIL = "thales.santoseng@gmail.com" # !!! TROQUE PELO SEU E-MAIL !!!
+SUPERADMIN_EMAIL = "thales.santoseng@gmail.com" # E-mail configurado corretamente!
 
 # Verificação de Acesso
 if not (hasattr(st, "user") and st.user.is_logged_in and getattr(st.user, "email", "").lower() == SUPERADMIN_EMAIL):
