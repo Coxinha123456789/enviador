@@ -1,3 +1,5 @@
+# No arquivo: paginas/inicial.py
+
 import streamlit as st
 from utils import conectar_firebase
 
@@ -11,12 +13,20 @@ if not (hasattr(st, "user") and st.user.is_logged_in):
     st.stop() 
 
 db, _ = conectar_firebase()
-SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"] 
 user_email = getattr(st.user, "email", "").lower()
 user_name = getattr(st.user, "name", "Usuário")
 
+@st.cache_data(ttl=120)
+def get_user_role(email):
+    if not email: return None
+    try:
+        user_doc = db.collection('users').document(email.lower()).get()
+        if user_doc.exists: return user_doc.to_dict().get("role")
+    except: return None
+    return None
+
+@st.cache_data(ttl=120)
 def get_supervisor_stats():
-    """Busca o número total de envios pendentes para todos os colaboradores."""
     pendentes = 0
     try:
         docs = db.collection('ColecaoEnviados').stream()
@@ -27,8 +37,8 @@ def get_supervisor_stats():
         st.error(f"Não foi possível carregar as estatísticas: {e}")
     return pendentes
 
+@st.cache_data(ttl=120)
 def get_collaborator_stats(email):
-    """Busca as estatísticas de envios para um colaborador específico."""
     stats = {'pendentes': 0, 'aprovados': 0, 'reprovados': 0}
     try:
         doc_ref = db.collection('ColecaoEnviados').document(email)
@@ -42,6 +52,7 @@ def get_collaborator_stats(email):
         st.error(f"Não foi possível carregar suas estatísticas: {e}")
     return stats
 
+user_role = get_user_role(user_email)
 st.title(f"Bem-vindo(a), {user_name}!")
 
 with st.sidebar:
@@ -53,47 +64,36 @@ with st.sidebar:
         st.logout()
     st.divider()
 
-if user_email in SUPERVISOR_EMAILS:
+if user_role == 'supervisor':
     st.subheader("Portal do Supervisor")
     pendentes_total = get_supervisor_stats()
-
     st.info(f"Você tem **{pendentes_total}** documento(s) aguardando sua análise.", icon="🔔")
     st.divider()
-
     st.subheader("Ações Rápidas")
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
             st.markdown("#### 📊 Dashboard Analítico")
-            st.write("Visualize métricas, gráficos e a performance geral do processo.")
             st.page_link("paginas/dashboard.py", label="Acessar Dashboard", icon="📊")
-    
     with col2:
         with st.container(border=True):
             st.markdown("#### 🛠️ Gerenciar Envios")
-            st.write("Analise, aprove ou reprove os documentos enviados pelos colaboradores.")
             st.page_link("paginas/supervisor.py", label="Gerenciar Documentos", icon="🛠️")
-
 else:
     st.subheader("Seu Resumo")
     stats = get_collaborator_stats(user_email)
-
     col1, col2, col3 = st.columns(3)
     col1.metric("Pendentes", f"{stats['pendentes']} 🟡")
     col2.metric("Aprovados", f"{stats['aprovados']} 🟢")
     col3.metric("Reprovados", f"{stats['reprovados']} 🔴")
     st.divider()
-
     st.subheader("Ações Rápidas")
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
             st.markdown("#### 📤 Enviar Novo Documento")
-            st.write("Faça o upload de um novo atestado ou documento para validação.")
             st.page_link("paginas/pagina1.py", label="Iniciar Envio", icon="📤")
-
     with col2:
         with st.container(border=True):
             st.markdown("#### 📜 Meu Histórico")
-            st.write("Acompanhe o status e a linha do tempo de todos os seus envios.")
             st.page_link("paginas/historico.py", label="Ver Histórico", icon="📜")
