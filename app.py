@@ -1,44 +1,64 @@
+# No arquivo: app.py
+
 import streamlit as st
+from utils import conectar_firebase
 
-# -----------------------------------------------------------------------------
-# Lógica de Navegação Aprimorada
-# -----------------------------------------------------------------------------
+# --- Configurações Globais ---
+SUPERADMIN_EMAIL = "thales.santoseng@gmail.com" # !!! TROQUE PELO SEU E-MAIL !!!
 
-# Lista de e-mails de supervisores
-SUPERVISOR_EMAILS = ["thalestatasena@gmail.com"]
+# --- Conexão e Funções de Permissão ---
+db, _ = conectar_firebase()
 
-def get_paginas(user_email):
-    """Retorna as páginas específicas para o perfil do usuário."""
-    if user_email in SUPERVISOR_EMAILS:
-        # Páginas para o supervisor com Dashboard
+@st.cache_data(ttl=300)
+def get_user_role(email):
+    """Consulta o Firestore para obter a função (role) de um usuário."""
+    if not email:
+        return None
+    try:
+        user_doc = db.collection('users').document(email.lower()).get()
+        if user_doc.exists:
+            return user_doc.to_dict().get("role")
+    except Exception as e:
+        st.error(f"Erro ao verificar permissões: {e}")
+        return None
+    return None
+
+# --- Lógica de Navegação ---
+def get_paginas_por_role(role):
+    """Retorna as páginas específicas para a função do usuário."""
+    if role == "supervisor":
         return {
             "Supervisor": [
                 st.Page("paginas/dashboard.py", title="Dashboard", icon='📊'),
                 st.Page("paginas/supervisor.py", title="Gerenciar Envios", icon='🛠️')
             ]
         }
-    else:
-        # Páginas para o colaborador
+    elif role == "colaborador":
         return {
             "Colaborador": [
                 st.Page("paginas/pagina1.py", title="Enviar Documento", icon='📤'),
                 st.Page("paginas/historico.py", title="Meu Histórico", icon='📜')
             ]
         }
+    return {}
 
-# Páginas visíveis para todos
-base_paginas = {
+# --- Construção do Menu ---
+paginas = {
     "Página Principal": [
         st.Page("paginas/inicial.py", title="Início", icon='🚀', default=True)
     ]
 }
 
-# Verifica se o usuário está logado para montar o menu
 if hasattr(st, "user") and getattr(st.user, "is_logged_in", False):
     email = getattr(st.user, "email", "").lower()
-    paginas = base_paginas | get_paginas(email)
-else:
-    paginas = base_paginas
+    role = get_user_role(email)
+    
+    paginas.update(get_paginas_por_role(role))
+
+    if email == SUPERADMIN_EMAIL:
+        paginas["Administração"] = [
+            st.Page("paginas/superadm.py", title="Painel Super Admin", icon='🔑')
+        ]
 
 # Cria e executa a navegação
 pg = st.navigation(paginas)
